@@ -314,6 +314,16 @@ export type Database = {
         Args: { p_user_id: string; p_xp: number }
         Returns: undefined
       }
+      get_leaderboard: {
+        Args: never
+        Returns: {
+          id: string
+          level: string
+          name: string
+          streak: number
+          xp: number
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
