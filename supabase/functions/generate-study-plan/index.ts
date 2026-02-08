@@ -9,6 +9,7 @@ const corsHeaders = {
 const VALID_GOAL_TYPES = ['skill', 'concept', 'topic', 'subject', 'habit'] as const;
 const VALID_MASTERY_LEVELS = ['awareness', 'understanding', 'application', 'mastery'] as const;
 const VALID_TIME_AVAILABILITY = ['1-2', '3-5', '6-8', 'custom'] as const;
+const VALID_DURATION_UNITS = ['day', 'week', 'month', 'year'] as const;
 
 interface StudyBlock {
   id: string;
@@ -23,12 +24,18 @@ interface StudyPlan {
   blocks: StudyBlock[];
 }
 
+interface PlanDuration {
+  value: number;
+  unit: 'day' | 'week' | 'month' | 'year';
+}
+
 interface StudyPlanRequest {
   goalType: string;
   description: string;
   masteryLevel: string;
   timeAvailability: string;
   customHours?: number;
+  duration?: PlanDuration;
 }
 
 // Input validation function
@@ -37,7 +44,7 @@ function validateInput(body: unknown): { valid: true; data: StudyPlanRequest } |
     return { valid: false, error: 'Request body must be a JSON object' };
   }
 
-  const { goalType, description, masteryLevel, timeAvailability, customHours } = body as Record<string, unknown>;
+  const { goalType, description, masteryLevel, timeAvailability, customHours, duration } = body as Record<string, unknown>;
 
   // Validate goalType
   if (!goalType || typeof goalType !== 'string') {
@@ -88,6 +95,22 @@ function validateInput(body: unknown): { valid: true; data: StudyPlanRequest } |
     }
   }
 
+  // Validate duration (optional, defaults to 1 week)
+  let validatedDuration: PlanDuration = { value: 1, unit: 'week' };
+  if (duration !== undefined && duration !== null) {
+    if (typeof duration !== 'object') {
+      return { valid: false, error: 'duration must be an object with value and unit' };
+    }
+    const { value: durationValue, unit: durationUnit } = duration as Record<string, unknown>;
+    if (typeof durationValue !== 'number' || durationValue < 1 || durationValue > 365) {
+      return { valid: false, error: 'duration.value must be a number between 1 and 365' };
+    }
+    if (!durationUnit || typeof durationUnit !== 'string' || !VALID_DURATION_UNITS.includes(durationUnit as typeof VALID_DURATION_UNITS[number])) {
+      return { valid: false, error: `duration.unit must be one of: ${VALID_DURATION_UNITS.join(', ')}` };
+    }
+    validatedDuration = { value: durationValue, unit: durationUnit as PlanDuration['unit'] };
+  }
+
   return {
     valid: true,
     data: {
@@ -96,6 +119,7 @@ function validateInput(body: unknown): { valid: true; data: StudyPlanRequest } |
       masteryLevel,
       timeAvailability,
       customHours: typeof customHours === 'number' ? customHours : undefined,
+      duration: validatedDuration,
     },
   };
 }
@@ -159,7 +183,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { goalType, description, masteryLevel, timeAvailability, customHours } = validationResult.data;
+    const { goalType, description, masteryLevel, timeAvailability, customHours, duration } = validationResult.data;
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
@@ -172,6 +196,20 @@ Deno.serve(async (req) => {
       : timeAvailability === '3-5' ? 4 
       : 7;
 
+    // Calculate total days based on duration
+    const durationToDays = (d: PlanDuration): number => {
+      switch (d.unit) {
+        case 'day': return d.value;
+        case 'week': return d.value * 7;
+        case 'month': return d.value * 30;
+        case 'year': return d.value * 365;
+        default: return 7;
+      }
+    };
+    
+    const totalDays = Math.min(durationToDays(duration!), 365); // Cap at 1 year
+    const durationLabel = `${duration!.value} ${duration!.unit}${duration!.value > 1 ? 's' : ''}`;
+
     const systemPrompt = `You are an expert learning coach that creates personalized study plans. 
 You follow the 4Es principle (Engage, Explore, Explain, Execute) and use 5 learning blocks:
 - input: Consume new information (videos, reading, lectures)
@@ -183,8 +221,9 @@ You follow the 4Es principle (Engage, Explore, Explain, Execute) and use 5 learn
 Create study plans that are:
 - Balanced across all 5 blocks
 - Time-blocked appropriately
-- Progressive throughout the week
-- Focused on active learning over passive consumption`;
+- Progressive throughout the plan duration
+- Focused on active learning over passive consumption
+- Adapted to the specified duration (${durationLabel})`;
 
     // Sanitize description for prompt injection prevention
     const sanitizedDescription = description
@@ -192,15 +231,23 @@ Create study plans that are:
       .replace(/\n{3,}/g, '\n\n') // Limit consecutive newlines
       .substring(0, 500); // Ensure max length
 
-    const userPrompt = `Create a 7-day study plan for someone learning:
+    // Determine number of plan entries based on duration
+    const planEntries = Math.min(totalDays, 30); // Max 30 entries for longer plans
+    const dayInterval = totalDays > 30 ? Math.ceil(totalDays / 30) : 1;
+    
+    const userPrompt = `Create a study plan for someone learning over ${durationLabel}:
 
 Goal Type: ${goalType}
 Description: ${sanitizedDescription}
 Target Mastery Level: ${masteryLevel}
 Available Time: ${hoursPerDay} hours per day
+Total Duration: ${durationLabel} (${totalDays} days)
 
-Return a JSON array with 7 objects (one per day, Monday through Sunday). Each day should have:
-- day: string (e.g., "Monday")
+Return a JSON array with ${planEntries} objects. ${totalDays > 30 
+  ? `Since this is a long-term plan, create entries for key milestone days (every ${dayInterval} days approximately).`
+  : `Create one entry for each day.`
+} Each entry should have:
+- day: string (e.g., "Day 1", "Day 7", "Week 2", etc.)
 - blocks: array of study blocks with:
   - id: unique string
   - type: one of "input", "breakdown", "practice", "output", "review"
