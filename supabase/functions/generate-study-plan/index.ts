@@ -1,7 +1,14 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// Valid enum values for input validation
+const VALID_GOAL_TYPES = ['skill', 'concept', 'topic', 'subject', 'habit'] as const;
+const VALID_MASTERY_LEVELS = ['awareness', 'understanding', 'application', 'mastery'] as const;
+const VALID_TIME_AVAILABILITY = ['1-2', '3-5', '6-8', 'custom'] as const;
 
 interface StudyBlock {
   id: string;
@@ -16,21 +23,151 @@ interface StudyPlan {
   blocks: StudyBlock[];
 }
 
+interface StudyPlanRequest {
+  goalType: string;
+  description: string;
+  masteryLevel: string;
+  timeAvailability: string;
+  customHours?: number;
+}
+
+// Input validation function
+function validateInput(body: unknown): { valid: true; data: StudyPlanRequest } | { valid: false; error: string } {
+  if (!body || typeof body !== 'object') {
+    return { valid: false, error: 'Request body must be a JSON object' };
+  }
+
+  const { goalType, description, masteryLevel, timeAvailability, customHours } = body as Record<string, unknown>;
+
+  // Validate goalType
+  if (!goalType || typeof goalType !== 'string') {
+    return { valid: false, error: 'goalType is required and must be a string' };
+  }
+  if (!VALID_GOAL_TYPES.includes(goalType as typeof VALID_GOAL_TYPES[number])) {
+    return { valid: false, error: `goalType must be one of: ${VALID_GOAL_TYPES.join(', ')}` };
+  }
+
+  // Validate description
+  if (!description || typeof description !== 'string') {
+    return { valid: false, error: 'description is required and must be a string' };
+  }
+  const trimmedDescription = description.trim();
+  if (trimmedDescription.length < 10) {
+    return { valid: false, error: 'description must be at least 10 characters' };
+  }
+  if (trimmedDescription.length > 500) {
+    return { valid: false, error: 'description must be at most 500 characters' };
+  }
+
+  // Validate masteryLevel
+  if (!masteryLevel || typeof masteryLevel !== 'string') {
+    return { valid: false, error: 'masteryLevel is required and must be a string' };
+  }
+  if (!VALID_MASTERY_LEVELS.includes(masteryLevel as typeof VALID_MASTERY_LEVELS[number])) {
+    return { valid: false, error: `masteryLevel must be one of: ${VALID_MASTERY_LEVELS.join(', ')}` };
+  }
+
+  // Validate timeAvailability
+  if (!timeAvailability || typeof timeAvailability !== 'string') {
+    return { valid: false, error: 'timeAvailability is required and must be a string' };
+  }
+  if (!VALID_TIME_AVAILABILITY.includes(timeAvailability as typeof VALID_TIME_AVAILABILITY[number])) {
+    return { valid: false, error: `timeAvailability must be one of: ${VALID_TIME_AVAILABILITY.join(', ')}` };
+  }
+
+  // Validate customHours when timeAvailability is 'custom'
+  if (timeAvailability === 'custom') {
+    if (customHours === undefined || customHours === null) {
+      return { valid: false, error: 'customHours is required when timeAvailability is custom' };
+    }
+    if (typeof customHours !== 'number' || !Number.isInteger(customHours)) {
+      return { valid: false, error: 'customHours must be an integer' };
+    }
+    if (customHours < 1 || customHours > 24) {
+      return { valid: false, error: 'customHours must be between 1 and 24' };
+    }
+  }
+
+  return {
+    valid: true,
+    data: {
+      goalType,
+      description: trimmedDescription,
+      masteryLevel,
+      timeAvailability,
+      customHours: typeof customHours === 'number' ? customHours : undefined,
+    },
+  };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    // Authentication check
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: 'Missing or invalid authorization header' }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    // Verify user authentication
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
+    
+    if (claimsError || !claimsData?.claims) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - invalid token' }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const userId = claimsData.claims.sub;
+    if (!userId) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - no user ID in token' }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Parse and validate input
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(
+        JSON.stringify({ error: 'Invalid JSON in request body' }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const validationResult = validateInput(body);
+    if (!validationResult.valid) {
+      return new Response(
+        JSON.stringify({ error: validationResult.error }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { goalType, description, masteryLevel, timeAvailability, customHours } = validationResult.data;
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    const { goalType, description, masteryLevel, timeAvailability, customHours } = await req.json();
-
     const hoursPerDay = timeAvailability === 'custom' 
-      ? customHours 
+      ? customHours! 
       : timeAvailability === '1-2' ? 1.5 
       : timeAvailability === '3-5' ? 4 
       : 7;
@@ -49,10 +186,16 @@ Create study plans that are:
 - Progressive throughout the week
 - Focused on active learning over passive consumption`;
 
+    // Sanitize description for prompt injection prevention
+    const sanitizedDescription = description
+      .replace(/[<>]/g, '') // Remove potential HTML/XML tags
+      .replace(/\n{3,}/g, '\n\n') // Limit consecutive newlines
+      .substring(0, 500); // Ensure max length
+
     const userPrompt = `Create a 7-day study plan for someone learning:
 
 Goal Type: ${goalType}
-Description: ${description}
+Description: ${sanitizedDescription}
 Target Mastery Level: ${masteryLevel}
 Available Time: ${hoursPerDay} hours per day
 
@@ -65,7 +208,7 @@ Return a JSON array with 7 objects (one per day, Monday through Sunday). Each da
   - duration: minutes (total should roughly equal ${hoursPerDay * 60} minutes)
   - description: brief description of what to do
 
-Make the plan specific to their goal: "${description}"
+Make the plan specific to their goal: "${sanitizedDescription}"
 Adapt difficulty based on mastery level: ${masteryLevel}
 
 Return ONLY the JSON array, no other text.`;
