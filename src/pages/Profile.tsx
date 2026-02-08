@@ -1,16 +1,13 @@
 import Layout from '@/components/Layout';
 import { motion } from 'framer-motion';
-import { mockUser } from '@/lib/mock-data';
-import { Zap, Flame, Clock, FileText, Target, TrendingUp, Calendar } from 'lucide-react';
-
-const stats = [
-  { label: 'Total XP', value: mockUser.xp.toLocaleString(), icon: Zap, color: 'text-xp' },
-  { label: 'Current Streak', value: `${mockUser.streak} days`, icon: Flame, color: 'text-streak' },
-  { label: 'Study Hours', value: '127h', icon: Clock, color: 'text-highlight' },
-  { label: 'Reports Submitted', value: mockUser.reportsSubmitted.toString(), icon: FileText, color: 'text-level' },
-  { label: 'Goals Completed', value: '8', icon: Target, color: 'text-primary' },
-  { label: 'Days Active', value: '62', icon: Calendar, color: 'text-xp' },
-];
+import { Zap, Flame, Clock, FileText, Target, Calendar, Edit2 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { getProfile, updateProfile, getTodaySessions } from '@/lib/database';
+import { supabase } from '@/integrations/supabase/client';
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 
 const levels = [
   { name: 'Beginner', min: 0, max: 1000 },
@@ -20,8 +17,79 @@ const levels = [
 ];
 
 export default function Profile() {
-  const currentLevel = levels.find(l => mockUser.xp >= l.min && mockUser.xp < l.max) || levels[3];
-  const progress = ((mockUser.xp - currentLevel.min) / (currentLevel.max - currentLevel.min)) * 100;
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editFocus, setEditFocus] = useState('');
+
+  const { data: profile } = useQuery({
+    queryKey: ['profile', user?.id],
+    queryFn: () => user ? getProfile(user.id) : null,
+    enabled: !!user,
+  });
+
+  const { data: todaySessions } = useQuery({
+    queryKey: ['today-sessions', user?.id],
+    queryFn: () => user ? getTodaySessions(user.id) : [],
+    enabled: !!user,
+  });
+
+  const { data: allSessions } = useQuery({
+    queryKey: ['all-sessions', user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      const { data } = await supabase.from('study_sessions').select('duration_seconds').eq('user_id', user.id);
+      return data || [];
+    },
+    enabled: !!user,
+  });
+
+  const { data: reportsCount } = useQuery({
+    queryKey: ['reports-count', user?.id],
+    queryFn: async () => {
+      if (!user) return 0;
+      const { count } = await supabase.from('daily_reports').select('*', { count: 'exact', head: true }).eq('user_id', user.id);
+      return count || 0;
+    },
+    enabled: !!user,
+  });
+
+  const xp = profile?.xp || 0;
+  const currentLevel = levels.find(l => xp >= l.min && xp < l.max) || levels[3];
+  const progress = ((xp - currentLevel.min) / (currentLevel.max - currentLevel.min)) * 100;
+
+  const totalHours = (allSessions?.reduce((acc, s) => acc + (s.duration_seconds || 0), 0) || 0) / 3600;
+
+  const stats = [
+    { label: 'Total XP', value: xp.toLocaleString(), icon: Zap, color: 'text-xp' },
+    { label: 'Current Streak', value: `${profile?.streak || 0} days`, icon: Flame, color: 'text-streak' },
+    { label: 'Study Hours', value: `${totalHours.toFixed(0)}h`, icon: Clock, color: 'text-highlight' },
+    { label: 'Reports Submitted', value: reportsCount?.toString() || '0', icon: FileText, color: 'text-level' },
+    { label: 'Sessions', value: (todaySessions?.length || 0).toString(), icon: Target, color: 'text-primary' },
+    { label: 'Member Since', value: profile ? new Date(profile.created_at).toLocaleDateString() : '-', icon: Calendar, color: 'text-xp' },
+  ];
+
+  const handleSaveProfile = async () => {
+    if (!user) return;
+    try {
+      await updateProfile(user.id, { 
+        name: editName || profile?.name, 
+        focus: editFocus || profile?.focus 
+      });
+      toast.success('Profile updated!');
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      setEditing(false);
+    } catch (error) {
+      toast.error('Failed to update profile');
+    }
+  };
+
+  const startEditing = () => {
+    setEditName(profile?.name || '');
+    setEditFocus(profile?.focus || '');
+    setEditing(true);
+  };
 
   return (
     <Layout>
@@ -29,15 +97,45 @@ export default function Profile() {
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass-card rounded-2xl p-8">
           <div className="flex items-center gap-6">
             <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-primary text-3xl font-bold text-primary-foreground shadow-glow-primary">
-              {mockUser.name.charAt(0)}
+              {(profile?.name || user?.email)?.charAt(0)?.toUpperCase() || 'U'}
             </div>
-            <div>
-              <h1 className="font-display text-3xl font-bold text-foreground">{mockUser.name}</h1>
-              <p className="text-muted-foreground">{mockUser.focus}</p>
-              <div className="mt-2 flex items-center gap-4">
-                <span className="flex items-center gap-1 text-sm text-xp"><Zap className="h-4 w-4" /> {mockUser.xp.toLocaleString()} XP</span>
-                <span className="flex items-center gap-1 text-sm text-streak"><Flame className="h-4 w-4" /> {mockUser.streak}-day streak</span>
-              </div>
+            <div className="flex-1">
+              {editing ? (
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    placeholder="Your name"
+                    className="w-full rounded-lg border border-border bg-muted/50 px-3 py-2 text-lg font-bold text-foreground focus:border-primary focus:outline-none"
+                  />
+                  <input
+                    type="text"
+                    value={editFocus}
+                    onChange={(e) => setEditFocus(e.target.value)}
+                    placeholder="Learning focus"
+                    className="w-full rounded-lg border border-border bg-muted/50 px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
+                  />
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={handleSaveProfile}>Save</Button>
+                    <Button size="sm" variant="outline" onClick={() => setEditing(false)}>Cancel</Button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2">
+                    <h1 className="font-display text-3xl font-bold text-foreground">{profile?.name || 'Anonymous'}</h1>
+                    <button onClick={startEditing} className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground">
+                      <Edit2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <p className="text-muted-foreground">{profile?.focus || 'No focus set'}</p>
+                  <div className="mt-2 flex items-center gap-4">
+                    <span className="flex items-center gap-1 text-sm text-xp"><Zap className="h-4 w-4" /> {xp.toLocaleString()} XP</span>
+                    <span className="flex items-center gap-1 text-sm text-streak"><Flame className="h-4 w-4" /> {profile?.streak || 0}-day streak</span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
@@ -45,7 +143,7 @@ export default function Profile() {
           <div className="mt-6">
             <div className="flex items-center justify-between text-sm">
               <span className="font-medium text-foreground">{currentLevel.name}</span>
-              <span className="text-muted-foreground">{mockUser.xp.toLocaleString()} / {currentLevel.max.toLocaleString()} XP</span>
+              <span className="text-muted-foreground">{xp.toLocaleString()} / {currentLevel.max.toLocaleString()} XP</span>
             </div>
             <div className="mt-2 h-3 overflow-hidden rounded-full bg-muted">
               <motion.div
@@ -57,7 +155,7 @@ export default function Profile() {
             </div>
             <div className="mt-2 flex justify-between text-xs text-muted-foreground">
               {levels.map(l => (
-                <span key={l.name} className={mockUser.level === l.name ? 'font-bold text-primary' : ''}>{l.name}</span>
+                <span key={l.name} className={profile?.level === l.name ? 'font-bold text-primary' : ''}>{l.name}</span>
               ))}
             </div>
           </div>
@@ -83,27 +181,6 @@ export default function Profile() {
             </motion.div>
           ))}
         </div>
-
-        {/* Recent Activity */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="glass-card rounded-xl p-6">
-          <h2 className="mb-4 font-display text-lg font-semibold text-foreground">Recent Activity</h2>
-          <div className="space-y-3">
-            {[
-              { action: 'Submitted daily report', xp: '+50', time: '2h ago', color: 'text-xp' },
-              { action: 'Completed 2h focus session', xp: '+40', time: '4h ago', color: 'text-primary' },
-              { action: 'Helped Marcus with Redux', xp: '+25', time: '6h ago', color: 'text-level' },
-              { action: '12-day streak milestone!', xp: '+100', time: '1d ago', color: 'text-streak' },
-            ].map((activity, i) => (
-              <div key={i} className="flex items-center justify-between rounded-lg border border-border bg-muted/20 px-4 py-3">
-                <span className="text-sm text-foreground">{activity.action}</span>
-                <div className="flex items-center gap-3">
-                  <span className={`text-sm font-bold ${activity.color}`}>{activity.xp} XP</span>
-                  <span className="text-xs text-muted-foreground">{activity.time}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </motion.div>
       </div>
     </Layout>
   );

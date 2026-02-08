@@ -1,8 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import Layout from '@/components/Layout';
 import { motion } from 'framer-motion';
-import { Play, Pause, Square, RotateCcw, Zap, Volume2 } from 'lucide-react';
+import { Play, Pause, Square, RotateCcw, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/AuthContext';
+import { startStudySession, endStudySession, getTodaySessions } from '@/lib/database';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 type TimerState = 'idle' | 'running' | 'paused';
 
@@ -15,11 +19,23 @@ const BLOCK_LABELS: Record<string, string> = {
 };
 
 export default function StudyTimer() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [seconds, setSeconds] = useState(0);
   const [state, setState] = useState<TimerState>('idle');
   const [selectedBlock, setSelectedBlock] = useState('practice');
   const [topic, setTopic] = useState('');
-  const [sessionsToday, setSessionsToday] = useState(3);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+
+  const { data: todaySessions } = useQuery({
+    queryKey: ['today-sessions', user?.id],
+    queryFn: () => user ? getTodaySessions(user.id) : [],
+    enabled: !!user,
+  });
+
+  const sessionsToday = todaySessions?.length || 0;
+  const totalSeconds = todaySessions?.reduce((acc, s) => acc + (s.duration_seconds || 0), 0) || 0;
+  const totalXp = todaySessions?.reduce((acc, s) => acc + (s.xp_earned || 0), 0) || 0;
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -36,13 +52,42 @@ export default function StudyTimer() {
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
   }, []);
 
-  const handleStart = () => setState('running');
+  const handleStart = async () => {
+    if (!user) return;
+    
+    if (state === 'paused') {
+      setState('running');
+      return;
+    }
+
+    try {
+      const session = await startStudySession(user.id, topic || 'General Study', selectedBlock);
+      setCurrentSessionId(session.id);
+      setState('running');
+    } catch (error) {
+      toast.error('Failed to start session');
+    }
+  };
+
   const handlePause = () => setState('paused');
-  const handleStop = () => {
-    if (seconds > 60) setSessionsToday(s => s + 1);
+
+  const handleStop = async () => {
+    if (currentSessionId && seconds > 0) {
+      try {
+        await endStudySession(currentSessionId, seconds);
+        const xpEarned = Math.min(Math.floor(seconds / 60), 60);
+        toast.success(`Session ended! +${xpEarned} XP earned`);
+        queryClient.invalidateQueries({ queryKey: ['today-sessions'] });
+        queryClient.invalidateQueries({ queryKey: ['profile'] });
+      } catch (error) {
+        toast.error('Failed to save session');
+      }
+    }
     setState('idle');
     setSeconds(0);
+    setCurrentSessionId(null);
   };
+
   const handleReset = () => setSeconds(0);
 
   return (
@@ -111,7 +156,8 @@ export default function StudyTimer() {
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}
                 placeholder="What are you studying?"
-                className="w-full rounded-lg border border-border bg-muted/50 px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                disabled={state !== 'idle'}
+                className="w-full rounded-lg border border-border bg-muted/50 px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
               />
             </div>
             <div>
@@ -120,8 +166,9 @@ export default function StudyTimer() {
                 {Object.entries(BLOCK_LABELS).map(([key, label]) => (
                   <button
                     key={key}
-                    onClick={() => setSelectedBlock(key)}
-                    className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${selectedBlock === key ? 'bg-gradient-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'}`}
+                    onClick={() => state === 'idle' && setSelectedBlock(key)}
+                    disabled={state !== 'idle'}
+                    className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${selectedBlock === key ? 'bg-gradient-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'}`}
                   >
                     {label}
                   </button>
@@ -138,11 +185,11 @@ export default function StudyTimer() {
             <p className="text-xs text-muted-foreground">Sessions today</p>
           </div>
           <div className="glass-card rounded-xl p-4 text-center">
-            <p className="text-2xl font-bold text-streak">3.5h</p>
+            <p className="text-2xl font-bold text-streak">{(totalSeconds / 3600).toFixed(1)}h</p>
             <p className="text-xs text-muted-foreground">Total focus time</p>
           </div>
           <div className="glass-card rounded-xl p-4 text-center">
-            <p className="text-2xl font-bold text-level">+200</p>
+            <p className="text-2xl font-bold text-level">+{totalXp}</p>
             <p className="text-xs text-muted-foreground">XP earned today</p>
           </div>
         </motion.div>
