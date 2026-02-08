@@ -1,15 +1,17 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Zap, ArrowRight, ArrowLeft, Check, Loader2 } from 'lucide-react';
+import { Zap, ArrowRight, ArrowLeft, Check, Loader2, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
 import { createLearningGoal, saveStudyPlans, updateProfile } from '@/lib/database';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import type { GoalType, MasteryLevel, TimeAvailability } from '@/lib/types';
+import type { GoalType, MasteryLevel, TimeAvailability, DurationUnit, PlanDuration } from '@/lib/types';
 
-const steps = ['Goal Type', 'Description', 'Mastery Level', 'Time Availability'];
+const steps = ['Goal Type', 'Description', 'Mastery Level', 'Time & Duration'];
 
 const goalTypes: { value: GoalType; label: string; emoji: string }[] = [
   { value: 'skill', label: 'Skill', emoji: '🛠️' },
@@ -33,60 +35,120 @@ const timeOptions: { value: TimeAvailability; label: string }[] = [
   { value: 'custom', label: 'Custom' },
 ];
 
+const durationUnits: { value: DurationUnit; label: string; plural: string }[] = [
+  { value: 'day', label: 'Day', plural: 'Days' },
+  { value: 'week', label: 'Week', plural: 'Weeks' },
+  { value: 'month', label: 'Month', plural: 'Months' },
+  { value: 'year', label: 'Year', plural: 'Years' },
+];
+
+interface LearningPlan {
+  id: string;
+  goalType: GoalType | '';
+  description: string;
+  mastery: MasteryLevel | '';
+  time: TimeAvailability | '';
+  customHours?: number;
+  duration: PlanDuration;
+}
+
+const createEmptyPlan = (): LearningPlan => ({
+  id: crypto.randomUUID(),
+  goalType: '',
+  description: '',
+  mastery: '',
+  time: '',
+  duration: { value: 1, unit: 'week' },
+});
+
 export default function Onboarding() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [step, setStep] = useState(0);
-  const [goalType, setGoalType] = useState<GoalType | ''>('');
-  const [description, setDescription] = useState('');
-  const [mastery, setMastery] = useState<MasteryLevel | ''>('');
-  const [time, setTime] = useState<TimeAvailability | ''>('');
+  const [plans, setPlans] = useState<LearningPlan[]>([createEmptyPlan()]);
+  const [currentPlanIndex, setCurrentPlanIndex] = useState(0);
   const [generating, setGenerating] = useState(false);
 
+  const currentPlan = plans[currentPlanIndex];
+
+  const updateCurrentPlan = (updates: Partial<LearningPlan>) => {
+    setPlans(prev => prev.map((p, i) => 
+      i === currentPlanIndex ? { ...p, ...updates } : p
+    ));
+  };
+
+  const addPlan = () => {
+    const newPlan = createEmptyPlan();
+    setPlans(prev => [...prev, newPlan]);
+    setCurrentPlanIndex(plans.length);
+    setStep(0);
+  };
+
+  const removePlan = (index: number) => {
+    if (plans.length === 1) return;
+    setPlans(prev => prev.filter((_, i) => i !== index));
+    if (currentPlanIndex >= index && currentPlanIndex > 0) {
+      setCurrentPlanIndex(prev => prev - 1);
+    }
+  };
+
   const canNext = [
-    goalType !== '',
-    description.trim().length > 5,
-    mastery !== '',
-    time !== '',
+    currentPlan.goalType !== '',
+    currentPlan.description.trim().length > 5,
+    currentPlan.mastery !== '',
+    currentPlan.time !== '' && currentPlan.duration.value > 0,
   ][step];
 
+  const allPlansComplete = plans.every(plan => 
+    plan.goalType !== '' && 
+    plan.description.trim().length > 5 && 
+    plan.mastery !== '' && 
+    plan.time !== '' &&
+    plan.duration.value > 0
+  );
+
   const handleFinish = async () => {
-    if (!user || !goalType || !mastery || !time) return;
+    if (!user || !allPlansComplete) return;
     
     setGenerating(true);
     try {
-      // Create learning goal
-      const goal = await createLearningGoal({
-        user_id: user.id,
-        goal_type: goalType,
-        description,
-        mastery_level: mastery,
-        time_availability: time,
-        custom_hours: null,
-        is_active: true,
-      });
+      // Process each plan
+      for (const plan of plans) {
+        // Create learning goal
+        const goal = await createLearningGoal({
+          user_id: user.id,
+          goal_type: plan.goalType as GoalType,
+          description: plan.description,
+          mastery_level: plan.mastery as MasteryLevel,
+          time_availability: plan.time as TimeAvailability,
+          custom_hours: plan.customHours ?? null,
+          is_active: true,
+        });
 
-      // Update profile focus
-      await updateProfile(user.id, { focus: description.slice(0, 100) });
+        // Generate AI study plan
+        const { data, error } = await supabase.functions.invoke('generate-study-plan', {
+          body: {
+            goalType: plan.goalType,
+            description: plan.description,
+            masteryLevel: plan.mastery,
+            timeAvailability: plan.time,
+            customHours: plan.customHours,
+            duration: plan.duration,
+          },
+        });
 
-      // Generate AI study plan
-      const { data, error } = await supabase.functions.invoke('generate-study-plan', {
-        body: {
-          goalType,
-          description,
-          masteryLevel: mastery,
-          timeAvailability: time,
-        },
-      });
-
-      if (error) {
-        console.error('Error generating study plan:', error);
-        toast.error('Failed to generate study plan. You can create one manually.');
-      } else if (data?.studyPlan) {
-        await saveStudyPlans(user.id, goal.id, data.studyPlan);
-        toast.success('Study plan generated successfully!');
+        if (error) {
+          console.error('Error generating study plan:', error);
+          toast.error(`Failed to generate plan for "${plan.description.slice(0, 30)}..."`);
+        } else if (data?.studyPlan) {
+          await saveStudyPlans(user.id, goal.id, data.studyPlan);
+        }
       }
 
+      // Update profile focus with first plan's description
+      await updateProfile(user.id, { focus: plans[0].description.slice(0, 100) });
+
+      toast.success(`${plans.length} study plan${plans.length > 1 ? 's' : ''} generated successfully!`);
       navigate('/');
     } catch (error) {
       console.error('Onboarding error:', error);
@@ -111,6 +173,45 @@ export default function Onboarding() {
           <span className="font-display text-2xl font-bold text-foreground">learnflow</span>
         </div>
 
+        {/* Plan tabs */}
+        {plans.length > 1 && (
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            {plans.map((plan, index) => (
+              <button
+                key={plan.id}
+                onClick={() => {
+                  setCurrentPlanIndex(index);
+                  setStep(0);
+                }}
+                className={`group relative flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${
+                  currentPlanIndex === index
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                }`}
+              >
+                Plan {index + 1}
+                {plans.length > 1 && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removePlan(index);
+                    }}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                )}
+              </button>
+            ))}
+            <button
+              onClick={addPlan}
+              className="flex items-center gap-1 rounded-lg border border-dashed border-border px-3 py-1.5 text-sm text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+            >
+              <Plus className="h-3 w-3" /> Add Plan
+            </button>
+          </div>
+        )}
+
         {/* Progress */}
         <div className="mb-8 flex gap-2">
           {steps.map((_, i) => (
@@ -121,7 +222,7 @@ export default function Onboarding() {
         <div className="glass-card rounded-2xl p-8">
           <AnimatePresence mode="wait">
             <motion.div
-              key={step}
+              key={`${currentPlan.id}-${step}`}
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
@@ -135,8 +236,8 @@ export default function Onboarding() {
                     {goalTypes.map((g) => (
                       <button
                         key={g.value}
-                        onClick={() => setGoalType(g.value)}
-                        className={`rounded-xl border p-4 text-left transition-all ${goalType === g.value ? 'border-primary bg-primary/10 shadow-glow-primary' : 'border-border bg-muted/30 hover:border-primary/50'}`}
+                        onClick={() => updateCurrentPlan({ goalType: g.value })}
+                        className={`rounded-xl border p-4 text-left transition-all ${currentPlan.goalType === g.value ? 'border-primary bg-primary/10 shadow-glow-primary' : 'border-border bg-muted/30 hover:border-primary/50'}`}
                       >
                         <span className="text-2xl">{g.emoji}</span>
                         <p className="mt-2 text-sm font-medium text-foreground">{g.label}</p>
@@ -151,8 +252,8 @@ export default function Onboarding() {
                   <h2 className="font-display text-xl font-bold text-foreground">Describe your goal</h2>
                   <p className="mt-1 text-sm text-muted-foreground">What specifically do you want to learn?</p>
                   <textarea
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
+                    value={currentPlan.description}
+                    onChange={(e) => updateCurrentPlan({ description: e.target.value })}
                     placeholder="e.g., Learn React hooks and state management for building modern web apps..."
                     rows={4}
                     className="mt-6 w-full rounded-lg border border-border bg-muted/50 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
@@ -168,8 +269,8 @@ export default function Onboarding() {
                     {masteryLevels.map((m) => (
                       <button
                         key={m.value}
-                        onClick={() => setMastery(m.value)}
-                        className={`w-full rounded-xl border p-4 text-left transition-all ${mastery === m.value ? 'border-primary bg-primary/10 shadow-glow-primary' : 'border-border bg-muted/30 hover:border-primary/50'}`}
+                        onClick={() => updateCurrentPlan({ mastery: m.value })}
+                        className={`w-full rounded-xl border p-4 text-left transition-all ${currentPlan.mastery === m.value ? 'border-primary bg-primary/10 shadow-glow-primary' : 'border-border bg-muted/30 hover:border-primary/50'}`}
                       >
                         <p className="text-sm font-medium text-foreground">{m.label}</p>
                         <p className="mt-0.5 text-xs text-muted-foreground">{m.desc}</p>
@@ -181,18 +282,73 @@ export default function Onboarding() {
 
               {step === 3 && (
                 <div>
-                  <h2 className="font-display text-xl font-bold text-foreground">Time availability</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">How much time can you dedicate daily?</p>
-                  <div className="mt-6 grid grid-cols-2 gap-3">
-                    {timeOptions.map((t) => (
-                      <button
-                        key={t.value}
-                        onClick={() => setTime(t.value)}
-                        className={`rounded-xl border p-4 text-center transition-all ${time === t.value ? 'border-primary bg-primary/10 shadow-glow-primary' : 'border-border bg-muted/30 hover:border-primary/50'}`}
+                  <h2 className="font-display text-xl font-bold text-foreground">Time & Duration</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">How much time can you dedicate, and for how long?</p>
+                  
+                  {/* Daily time availability */}
+                  <div className="mt-6">
+                    <label className="text-sm font-medium text-foreground">Daily study time</label>
+                    <div className="mt-2 grid grid-cols-2 gap-3">
+                      {timeOptions.map((t) => (
+                        <button
+                          key={t.value}
+                          onClick={() => updateCurrentPlan({ time: t.value })}
+                          className={`rounded-xl border p-3 text-center transition-all ${currentPlan.time === t.value ? 'border-primary bg-primary/10 shadow-glow-primary' : 'border-border bg-muted/30 hover:border-primary/50'}`}
+                        >
+                          <p className="text-sm font-medium text-foreground">{t.label}</p>
+                        </button>
+                      ))}
+                    </div>
+                    {currentPlan.time === 'custom' && (
+                      <div className="mt-3">
+                        <Input
+                          type="number"
+                          min={1}
+                          max={24}
+                          value={currentPlan.customHours || ''}
+                          onChange={(e) => updateCurrentPlan({ customHours: parseInt(e.target.value) || undefined })}
+                          placeholder="Hours per day"
+                          className="w-full"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Plan duration */}
+                  <div className="mt-6">
+                    <label className="text-sm font-medium text-foreground">Plan duration</label>
+                    <div className="mt-2 flex gap-3">
+                      <Input
+                        type="number"
+                        min={1}
+                        max={365}
+                        value={currentPlan.duration.value}
+                        onChange={(e) => updateCurrentPlan({ 
+                          duration: { 
+                            ...currentPlan.duration, 
+                            value: parseInt(e.target.value) || 1 
+                          } 
+                        })}
+                        className="w-24"
+                      />
+                      <Select
+                        value={currentPlan.duration.unit}
+                        onValueChange={(value: DurationUnit) => updateCurrentPlan({ 
+                          duration: { ...currentPlan.duration, unit: value } 
+                        })}
                       >
-                        <p className="text-sm font-medium text-foreground">{t.label}</p>
-                      </button>
-                    ))}
+                        <SelectTrigger className="flex-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {durationUnits.map((unit) => (
+                            <SelectItem key={unit.value} value={unit.value}>
+                              {currentPlan.duration.value === 1 ? unit.label : unit.plural}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </div>
               )}
@@ -218,21 +374,33 @@ export default function Onboarding() {
                 Next <ArrowRight className="ml-1 h-4 w-4" />
               </Button>
             ) : (
-              <Button
-                onClick={handleFinish}
-                disabled={!canNext || generating}
-                className="bg-gradient-primary text-primary-foreground hover:opacity-90"
-              >
-                {generating ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating Plan...
-                  </>
-                ) : (
-                  <>
-                    <Check className="mr-1 h-4 w-4" /> Start Learning
-                  </>
+              <div className="flex gap-2">
+                {plans.length === 1 && (
+                  <Button
+                    variant="outline"
+                    onClick={addPlan}
+                    disabled={!canNext}
+                    className="border-primary text-primary hover:bg-primary/10"
+                  >
+                    <Plus className="mr-1 h-4 w-4" /> Add Another
+                  </Button>
                 )}
-              </Button>
+                <Button
+                  onClick={handleFinish}
+                  disabled={!allPlansComplete || generating}
+                  className="bg-gradient-primary text-primary-foreground hover:opacity-90"
+                >
+                  {generating ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating {plans.length} Plan{plans.length > 1 ? 's' : ''}...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="mr-1 h-4 w-4" /> Start Learning
+                    </>
+                  )}
+                </Button>
+              </div>
             )}
           </div>
         </div>

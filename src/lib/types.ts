@@ -23,7 +23,13 @@ export interface StudySession {
 export type GoalType = 'skill' | 'concept' | 'topic' | 'subject' | 'habit';
 export type MasteryLevel = 'awareness' | 'understanding' | 'application' | 'mastery';
 export type TimeAvailability = '1-2' | '3-5' | '6-8' | 'custom';
+export type DurationUnit = 'day' | 'week' | 'month' | 'year';
 export type LearningBlock = 'input' | 'breakdown' | 'practice' | 'output' | 'review';
+
+export interface PlanDuration {
+  value: number;
+  unit: DurationUnit;
+}
 
 export interface LearningGoal {
   goalType: GoalType;
