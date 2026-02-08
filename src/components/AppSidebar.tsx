@@ -1,9 +1,11 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, Timer, FileText, Users, Trophy, 
-  User, BookOpen, Zap, Flame
+  User, BookOpen, Zap, Flame, LogOut
 } from 'lucide-react';
-import { mockUser } from '@/lib/mock-data';
+import { useAuth } from '@/contexts/AuthContext';
+import { useQuery } from '@tanstack/react-query';
+import { getProfile } from '@/lib/database';
 import { cn } from '@/lib/utils';
 
 const navItems = [
@@ -18,6 +20,18 @@ const navItems = [
 
 export default function AppSidebar() {
   const location = useLocation();
+  const { user, signOut } = useAuth();
+
+  const { data: profile } = useQuery({
+    queryKey: ['profile', user?.id],
+    queryFn: () => user ? getProfile(user.id) : null,
+    enabled: !!user,
+  });
+
+  const displayName = profile?.name || user?.email?.split('@')[0] || 'User';
+  const level = profile?.level || 'Beginner';
+  const xp = profile?.xp || 0;
+  const streak = profile?.streak || 0;
 
   return (
     <aside className="fixed left-0 top-0 z-40 flex h-screen w-64 flex-col border-r border-border bg-sidebar">
@@ -33,19 +47,19 @@ export default function AppSidebar() {
       <div className="mx-4 mb-4 rounded-lg border border-border/50 bg-muted/50 p-3">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-primary text-sm font-bold text-primary-foreground">
-            {mockUser.name.charAt(0)}
+            {displayName.charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="truncate text-sm font-medium text-foreground">{mockUser.name}</p>
-            <p className="text-xs text-muted-foreground">{mockUser.level}</p>
+            <p className="truncate text-sm font-medium text-foreground">{displayName}</p>
+            <p className="text-xs text-muted-foreground">{level}</p>
           </div>
         </div>
         <div className="mt-3 flex items-center justify-between text-xs">
           <span className="flex items-center gap-1 text-xp">
-            <Zap className="h-3.5 w-3.5" /> {mockUser.xp.toLocaleString()} XP
+            <Zap className="h-3.5 w-3.5" /> {xp.toLocaleString()} XP
           </span>
           <span className="flex items-center gap-1 text-streak">
-            <Flame className="h-3.5 w-3.5" /> {mockUser.streak} days
+            <Flame className="h-3.5 w-3.5" /> {streak} days
           </span>
         </div>
       </div>
@@ -74,7 +88,13 @@ export default function AppSidebar() {
 
       {/* Bottom */}
       <div className="border-t border-border p-4">
-        <p className="text-[11px] text-muted-foreground">learnflow v1.0 • Learn to Earn</p>
+        <button
+          onClick={signOut}
+          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        >
+          <LogOut className="h-4 w-4" /> Sign out
+        </button>
+        <p className="mt-2 text-[11px] text-muted-foreground">learnflow v1.0 • Learn to Earn</p>
       </div>
     </aside>
   );

@@ -1,8 +1,12 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Zap, ArrowRight, ArrowLeft, Check } from 'lucide-react';
+import { Zap, ArrowRight, ArrowLeft, Check, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/AuthContext';
+import { createLearningGoal, saveStudyPlans, updateProfile } from '@/lib/database';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import type { GoalType, MasteryLevel, TimeAvailability } from '@/lib/types';
 
 const steps = ['Goal Type', 'Description', 'Mastery Level', 'Time Availability'];
@@ -31,11 +35,13 @@ const timeOptions: { value: TimeAvailability; label: string }[] = [
 
 export default function Onboarding() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [step, setStep] = useState(0);
   const [goalType, setGoalType] = useState<GoalType | ''>('');
   const [description, setDescription] = useState('');
   const [mastery, setMastery] = useState<MasteryLevel | ''>('');
   const [time, setTime] = useState<TimeAvailability | ''>('');
+  const [generating, setGenerating] = useState(false);
 
   const canNext = [
     goalType !== '',
@@ -44,7 +50,51 @@ export default function Onboarding() {
     time !== '',
   ][step];
 
-  const handleFinish = () => navigate('/');
+  const handleFinish = async () => {
+    if (!user || !goalType || !mastery || !time) return;
+    
+    setGenerating(true);
+    try {
+      // Create learning goal
+      const goal = await createLearningGoal({
+        user_id: user.id,
+        goal_type: goalType,
+        description,
+        mastery_level: mastery,
+        time_availability: time,
+        custom_hours: null,
+        is_active: true,
+      });
+
+      // Update profile focus
+      await updateProfile(user.id, { focus: description.slice(0, 100) });
+
+      // Generate AI study plan
+      const { data, error } = await supabase.functions.invoke('generate-study-plan', {
+        body: {
+          goalType,
+          description,
+          masteryLevel: mastery,
+          timeAvailability: time,
+        },
+      });
+
+      if (error) {
+        console.error('Error generating study plan:', error);
+        toast.error('Failed to generate study plan. You can create one manually.');
+      } else if (data?.studyPlan) {
+        await saveStudyPlans(user.id, goal.id, data.studyPlan);
+        toast.success('Study plan generated successfully!');
+      }
+
+      navigate('/');
+    } catch (error) {
+      console.error('Onboarding error:', error);
+      toast.error('Something went wrong. Please try again.');
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
@@ -170,10 +220,18 @@ export default function Onboarding() {
             ) : (
               <Button
                 onClick={handleFinish}
-                disabled={!canNext}
+                disabled={!canNext || generating}
                 className="bg-gradient-primary text-primary-foreground hover:opacity-90"
               >
-                <Check className="mr-1 h-4 w-4" /> Start Learning
+                {generating ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating Plan...
+                  </>
+                ) : (
+                  <>
+                    <Check className="mr-1 h-4 w-4" /> Start Learning
+                  </>
+                )}
               </Button>
             )}
           </div>
