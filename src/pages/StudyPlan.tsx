@@ -2,10 +2,11 @@ import Layout from '@/components/Layout';
 import { motion } from 'framer-motion';
 import { BookOpen, CheckCircle, Circle, Sparkles, Calendar, Clock } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getStudyPlansWithGoals, getLearningGoals } from '@/lib/database';
 import { Link } from 'react-router-dom';
 import AddGoalDialog from '@/components/AddGoalDialog';
+import GoalsList from '@/components/GoalsList';
 
 const blockColors: Record<string, string> = {
   input: 'bg-primary/10 text-primary border-primary/20',
@@ -25,6 +26,7 @@ function formatDuration(value: number | null, unit: string | null): string {
 
 export default function StudyPlan() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
   const { data: studyPlans, isLoading, refetch } = useQuery({
     queryKey: ['study-plans', user?.id],
@@ -40,6 +42,16 @@ export default function StudyPlan() {
 
   // Get the most recent active goal for header display
   const activeGoal = learningGoals?.find(g => g.is_active) || learningGoals?.[0];
+  
+  // Filter study plans to show only the active goal's plans
+  const activeGoalPlans = studyPlans?.filter(plan => 
+    (plan as any).goal_id === activeGoal?.id
+  ) || [];
+
+  const handleGoalSwitch = () => {
+    queryClient.invalidateQueries({ queryKey: ['study-plans'] });
+    refetch();
+  };
 
   if (isLoading) {
     return (
@@ -51,7 +63,7 @@ export default function StudyPlan() {
     );
   }
 
-  if (!studyPlans || studyPlans.length === 0) {
+  if (!activeGoalPlans || activeGoalPlans.length === 0) {
     return (
       <Layout>
         <div className="space-y-8">
@@ -62,6 +74,11 @@ export default function StudyPlan() {
             </div>
             <AddGoalDialog onGoalAdded={() => refetch()} />
           </motion.div>
+
+          {/* Show goals list even when no active plan */}
+          {learningGoals && learningGoals.length > 0 && (
+            <GoalsList onGoalSwitch={handleGoalSwitch} />
+          )}
 
           <div className="flex min-h-[40vh] items-center justify-center">
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="text-center">
@@ -123,6 +140,9 @@ export default function StudyPlan() {
           </motion.div>
         )}
 
+        {/* Goals List */}
+        <GoalsList onGoalSwitch={handleGoalSwitch} />
+
         {/* Legend */}
         <div className="flex flex-wrap gap-3">
           {Object.entries(blockColors).map(([type, cls]) => (
@@ -134,7 +154,7 @@ export default function StudyPlan() {
 
         {/* Days */}
         <div className="space-y-6">
-          {studyPlans.map((plan, dayIndex) => {
+          {activeGoalPlans.map((plan, dayIndex) => {
             const blocks = (plan.blocks as any[]) || [];
             const totalDuration = blocks.reduce((acc: number, b: any) => acc + (b.duration || 0), 0);
             const completedCount = blocks.filter((b: any) => b.completed).length;

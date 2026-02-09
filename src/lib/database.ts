@@ -126,6 +126,86 @@ export async function createLearningGoal(goal: Omit<LearningGoal, 'id' | 'create
   return data;
 }
 
+// Delete a learning goal and its associated study plans
+export async function deleteLearningGoal(goalId: string, userId: string) {
+  // First delete associated study plans
+  const { error: plansError } = await supabase
+    .from('study_plans')
+    .delete()
+    .eq('goal_id', goalId)
+    .eq('user_id', userId);
+  
+  if (plansError) throw plansError;
+  
+  // Then delete the goal
+  const { error: goalError } = await supabase
+    .from('learning_goals')
+    .delete()
+    .eq('id', goalId)
+    .eq('user_id', userId);
+  
+  if (goalError) throw goalError;
+}
+
+// Toggle goal active status
+export async function toggleGoalActive(goalId: string, userId: string, isActive: boolean) {
+  const { data, error } = await supabase
+    .from('learning_goals')
+    .update({ is_active: isActive })
+    .eq('id', goalId)
+    .eq('user_id', userId)
+    .select()
+    .single();
+  
+  if (error) throw error;
+  return data;
+}
+
+// Set a specific goal as the active one (deactivates others)
+export async function setActiveGoal(goalId: string, userId: string) {
+  // First deactivate all goals for this user
+  const { error: deactivateError } = await supabase
+    .from('learning_goals')
+    .update({ is_active: false })
+    .eq('user_id', userId);
+  
+  if (deactivateError) throw deactivateError;
+  
+  // Then activate the selected goal
+  const { data, error } = await supabase
+    .from('learning_goals')
+    .update({ is_active: true })
+    .eq('id', goalId)
+    .eq('user_id', userId)
+    .select()
+    .single();
+  
+  if (error) throw error;
+  return data;
+}
+
+// Get goal progress (completed blocks / total blocks)
+export async function getGoalProgress(goalId: string, userId: string): Promise<{ completed: number; total: number }> {
+  const { data: plans, error } = await supabase
+    .from('study_plans')
+    .select('blocks')
+    .eq('goal_id', goalId)
+    .eq('user_id', userId);
+  
+  if (error) throw error;
+  
+  let completed = 0;
+  let total = 0;
+  
+  (plans || []).forEach((plan) => {
+    const blocks = (plan.blocks as any[]) || [];
+    total += blocks.length;
+    completed += blocks.filter((b: any) => b.completed).length;
+  });
+  
+  return { completed, total };
+}
+
 export async function getActiveGoal(userId: string): Promise<LearningGoal | null> {
   const { data, error } = await supabase
     .from('learning_goals')
