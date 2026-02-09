@@ -22,9 +22,35 @@ export interface LearningGoal {
   mastery_level: string;
   time_availability: string;
   custom_hours: number | null;
+  duration_value: number | null;
+  duration_unit: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+// Get all learning goals for a user
+export async function getLearningGoals(userId: string): Promise<LearningGoal[]> {
+  const { data, error } = await supabase
+    .from('learning_goals')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+  
+  if (error) throw error;
+  return data || [];
+}
+
+// Get study plans with their associated goals
+export async function getStudyPlansWithGoals(userId: string) {
+  const { data: plans, error: plansError } = await supabase
+    .from('study_plans')
+    .select('*, learning_goals(*)')
+    .eq('user_id', userId)
+    .order('day_of_week', { ascending: true });
+  
+  if (plansError) throw plansError;
+  return plans || [];
 }
 
 export interface StudySession {

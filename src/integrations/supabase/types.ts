@@ -94,6 +94,8 @@ export type Database = {
           created_at: string
           custom_hours: number | null
           description: string
+          duration_unit: string | null
+          duration_value: number | null
           goal_type: string
           id: string
           is_active: boolean
@@ -106,6 +108,8 @@ export type Database = {
           created_at?: string
           custom_hours?: number | null
           description: string
+          duration_unit?: string | null
+          duration_value?: number | null
           goal_type: string
           id?: string
           is_active?: boolean
@@ -118,6 +122,8 @@ export type Database = {
           created_at?: string
           custom_hours?: number | null
           description?: string
+          duration_unit?: string | null
+          duration_value?: number | null
           goal_type?: string
           id?: string
           is_active?: boolean

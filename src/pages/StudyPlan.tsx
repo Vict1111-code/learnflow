@@ -1,10 +1,11 @@
 import Layout from '@/components/Layout';
 import { motion } from 'framer-motion';
-import { BookOpen, CheckCircle, Circle, Sparkles } from 'lucide-react';
+import { BookOpen, CheckCircle, Circle, Sparkles, Calendar, Clock } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
-import { getStudyPlans, getActiveGoal } from '@/lib/database';
+import { getStudyPlansWithGoals, getLearningGoals } from '@/lib/database';
 import { Link } from 'react-router-dom';
+import AddGoalDialog from '@/components/AddGoalDialog';
 
 const blockColors: Record<string, string> = {
   input: 'bg-primary/10 text-primary border-primary/20',
@@ -16,20 +17,29 @@ const blockColors: Record<string, string> = {
 
 const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
+function formatDuration(value: number | null, unit: string | null): string {
+  if (!value || !unit) return 'Not set';
+  const plural = value > 1 ? 's' : '';
+  return `${value} ${unit}${plural}`;
+}
+
 export default function StudyPlan() {
   const { user } = useAuth();
 
-  const { data: studyPlans, isLoading } = useQuery({
+  const { data: studyPlans, isLoading, refetch } = useQuery({
     queryKey: ['study-plans', user?.id],
-    queryFn: () => user ? getStudyPlans(user.id) : [],
+    queryFn: () => user ? getStudyPlansWithGoals(user.id) : [],
     enabled: !!user,
   });
 
-  const { data: activeGoal } = useQuery({
-    queryKey: ['active-goal', user?.id],
-    queryFn: () => user ? getActiveGoal(user.id) : null,
+  const { data: learningGoals } = useQuery({
+    queryKey: ['learning-goals', user?.id],
+    queryFn: () => user ? getLearningGoals(user.id) : [],
     enabled: !!user,
   });
+
+  // Get the most recent active goal for header display
+  const activeGoal = learningGoals?.find(g => g.is_active) || learningGoals?.[0];
 
   if (isLoading) {
     return (
@@ -45,9 +55,12 @@ export default function StudyPlan() {
     return (
       <Layout>
         <div className="space-y-8">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            <h1 className="font-display text-3xl font-bold text-foreground">Study Plan</h1>
-            <p className="mt-1 text-muted-foreground">Your optimized weekly learning roadmap</p>
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
+            <div>
+              <h1 className="font-display text-3xl font-bold text-foreground">Study Plan</h1>
+              <p className="mt-1 text-muted-foreground">Your optimized weekly learning roadmap</p>
+            </div>
+            <AddGoalDialog onGoalAdded={() => refetch()} />
           </motion.div>
 
           <div className="flex min-h-[40vh] items-center justify-center">
@@ -56,13 +69,7 @@ export default function StudyPlan() {
                 <Sparkles className="h-8 w-8 text-muted-foreground" />
               </div>
               <h2 className="font-display text-xl font-bold text-foreground">No Study Plan Yet</h2>
-              <p className="mt-2 text-muted-foreground">Complete onboarding to generate your personalized AI study plan</p>
-              <Link
-                to="/onboarding"
-                className="mt-4 inline-flex items-center gap-2 rounded-lg bg-gradient-primary px-6 py-3 text-sm font-medium text-primary-foreground hover:opacity-90"
-              >
-                <Sparkles className="h-4 w-4" /> Create Your Plan
-              </Link>
+              <p className="mt-2 text-muted-foreground">Create your first learning goal to generate an AI study plan</p>
             </motion.div>
           </div>
         </div>
@@ -73,12 +80,48 @@ export default function StudyPlan() {
   return (
     <Layout>
       <div className="space-y-8">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <h1 className="font-display text-3xl font-bold text-foreground">Study Plan</h1>
-          <p className="mt-1 text-muted-foreground">
-            {activeGoal ? `Learning: ${activeGoal.description.slice(0, 60)}...` : 'Your optimized weekly learning roadmap'}
-          </p>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
+          <div>
+            <h1 className="font-display text-3xl font-bold text-foreground">Study Plan</h1>
+            <p className="mt-1 text-muted-foreground">
+              {activeGoal ? `Learning: ${activeGoal.description.slice(0, 60)}...` : 'Your optimized weekly learning roadmap'}
+            </p>
+          </div>
+          <AddGoalDialog onGoalAdded={() => refetch()} />
         </motion.div>
+
+        {/* Active Goal Info */}
+        {activeGoal && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="glass-card rounded-xl p-4"
+          >
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-primary">
+                <Sparkles className="h-6 w-6 text-primary-foreground" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-display font-semibold text-foreground">{activeGoal.description.slice(0, 80)}{activeGoal.description.length > 80 ? '...' : ''}</h3>
+                <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    <Calendar className="h-4 w-4" />
+                    {formatDuration(activeGoal.duration_value, activeGoal.duration_unit)}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-4 w-4" />
+                    {activeGoal.time_availability === 'custom' 
+                      ? `${activeGoal.custom_hours}h/day` 
+                      : `${activeGoal.time_availability}h/day`}
+                  </span>
+                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium capitalize text-primary">
+                    {activeGoal.mastery_level}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         {/* Legend */}
         <div className="flex flex-wrap gap-3">
