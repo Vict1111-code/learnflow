@@ -122,6 +122,8 @@ export default function Onboarding() {
           mastery_level: plan.mastery as MasteryLevel,
           time_availability: plan.time as TimeAvailability,
           custom_hours: plan.customHours ?? null,
+          duration_value: plan.duration.value,
+          duration_unit: plan.duration.unit,
           is_active: true,
         });
 
