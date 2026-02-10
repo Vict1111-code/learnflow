@@ -14,6 +14,7 @@ import Community from "./pages/Community";
 import Leaderboard from "./pages/Leaderboard";
 import Profile from "./pages/Profile";
 import Onboarding from "./pages/Onboarding";
+import GoalDetail from "./pages/GoalDetail";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -65,6 +66,11 @@ const App = () => (
             <Route path="/profile" element={
               <ProtectedRoute>
                 <Profile />
+              </ProtectedRoute>
+            } />
+            <Route path="/goal/:id" element={
+              <ProtectedRoute>
+                <GoalDetail />
               </ProtectedRoute>
             } />
             <Route path="*" element={<NotFound />} />
