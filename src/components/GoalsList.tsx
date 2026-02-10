@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { 
   Target, 
   CheckCircle2, 
@@ -10,7 +11,8 @@ import {
   Clock,
   ChevronDown,
   ChevronUp,
-  Loader2
+  Loader2,
+  Eye
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -63,7 +65,7 @@ function GoalCard({
   isToggling: boolean;
 }) {
   const { user } = useAuth();
-  
+  const navigate = useNavigate();
   const { data: progress } = useQuery({
     queryKey: ['goal-progress', goal.id],
     queryFn: () => user ? getGoalProgress(goal.id, user.id) : { completed: 0, total: 0 },
@@ -137,6 +139,15 @@ function GoalCard({
 
         {/* Actions */}
         <div className="flex flex-col gap-1 shrink-0">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate(`/goal/${goal.id}`)}
+            className="h-8 px-2 text-xs gap-1"
+          >
+            <Eye className="h-3 w-3" />
+            View
+          </Button>
           {!goal.is_active && (
             <Button
               variant="ghost"
