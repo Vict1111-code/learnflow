@@ -1,6 +1,7 @@
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getLearningGoals, getGoalProgress } from '@/lib/database';
 import { supabase } from '@/integrations/supabase/client';
 import Layout from '@/components/Layout';
@@ -14,9 +15,23 @@ import {
   Circle,
   Sparkles,
   Target,
+  RefreshCw,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { toast } from 'sonner';
 
 const blockColors: Record<string, string> = {
   input: 'bg-primary/10 text-primary border-primary/20',
@@ -38,6 +53,8 @@ export default function GoalDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [isRegenerating, setIsRegenerating] = useState(false);
 
   const { data: goals } = useQuery({
     queryKey: ['learning-goals', user?.id],
@@ -72,6 +89,64 @@ export default function GoalDetail() {
   const progressPercent = progress?.total
     ? Math.round((progress.completed / progress.total) * 100)
     : 0;
+
+  const handleRegenerate = async () => {
+    if (!user || !goal) return;
+    setIsRegenerating(true);
+
+    try {
+      // Delete existing plans for this goal
+      await supabase
+        .from('study_plans')
+        .delete()
+        .eq('goal_id', goal.id)
+        .eq('user_id', user.id);
+
+      // Call the edge function to generate new plans
+      const { data: sessionData } = await supabase.auth.getSession();
+      const response = await supabase.functions.invoke('generate-study-plan', {
+        body: {
+          goalType: goal.goal_type,
+          description: goal.description,
+          masteryLevel: goal.mastery_level,
+          timeAvailability: goal.time_availability,
+          customHours: goal.custom_hours,
+          duration: goal.duration_value && goal.duration_unit
+            ? { value: goal.duration_value, unit: goal.duration_unit }
+            : { value: 1, unit: 'week' },
+        },
+      });
+
+      if (response.error) throw new Error(response.error.message);
+
+      const studyPlan = response.data?.studyPlan;
+      if (!studyPlan || !Array.isArray(studyPlan)) {
+        throw new Error('Invalid study plan response');
+      }
+
+      // Save new plans
+      const planRows = studyPlan.map((plan: any, index: number) => ({
+        user_id: user.id,
+        goal_id: goal.id,
+        day_of_week: index,
+        blocks: plan.blocks || [],
+      }));
+
+      const { error: insertError } = await supabase.from('study_plans').insert(planRows);
+      if (insertError) throw insertError;
+
+      // Refresh queries
+      queryClient.invalidateQueries({ queryKey: ['goal-plans', id] });
+      queryClient.invalidateQueries({ queryKey: ['goal-progress', id] });
+      queryClient.invalidateQueries({ queryKey: ['study-plans'] });
+      toast.success('Study plan regenerated successfully!');
+    } catch (error) {
+      console.error('Error regenerating plan:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to regenerate study plan');
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
 
   if (!goal && !plansLoading) {
     return (
@@ -159,6 +234,41 @@ export default function GoalDetail() {
                   <p className="text-xs text-muted-foreground">
                     {progress?.completed || 0} of {progress?.total || 0} study blocks completed
                   </p>
+                </div>
+
+                {/* Regenerate button */}
+                <div className="mt-4">
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={isRegenerating}
+                        className="gap-2"
+                      >
+                        {isRegenerating ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-4 w-4" />
+                        )}
+                        {isRegenerating ? 'Regenerating...' : 'Regenerate Plan'}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Regenerate Study Plan?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will replace your current study plan with a freshly generated one. All progress on existing blocks will be lost.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleRegenerate}>
+                          Regenerate
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </div>
             </div>
