@@ -91,6 +91,7 @@ export type Database = {
       }
       learning_goals: {
         Row: {
+          concepts: Json | null
           created_at: string
           custom_hours: number | null
           description: string
@@ -100,11 +101,13 @@ export type Database = {
           id: string
           is_active: boolean
           mastery_level: string
+          resources: Json | null
           time_availability: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          concepts?: Json | null
           created_at?: string
           custom_hours?: number | null
           description: string
@@ -114,11 +117,13 @@ export type Database = {
           id?: string
           is_active?: boolean
           mastery_level: string
+          resources?: Json | null
           time_availability: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          concepts?: Json | null
           created_at?: string
           custom_hours?: number | null
           description?: string
@@ -128,6 +133,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           mastery_level?: string
+          resources?: Json | null
           time_availability?: string
           updated_at?: string
           user_id?: string

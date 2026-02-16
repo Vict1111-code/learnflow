@@ -111,17 +111,28 @@ export default function AddGoalDialog({ onGoalAdded }: AddGoalDialogProps) {
       if (planError) {
         console.error('Plan generation error:', planError);
         toast.warning('Goal created, but study plan generation failed. You can try again later.');
-      } else if (planData?.weeklyPlan) {
+      } else if (planData?.studyPlan) {
         // Save study plans
-        const planRows = planData.weeklyPlan.map((plan: any, index: number) => ({
+        const planRows = (planData.studyPlan as any[]).map((plan: any, index: number) => ({
           user_id: user.id,
           goal_id: goal.id,
           day_of_week: index,
-          blocks: plan.blocks || [],
+          blocks: (plan.blocks || []).map((b: any) => ({ ...b, conceptId: plan.conceptId || b.conceptId })),
         }));
 
         const { error: saveError } = await supabase.from('study_plans').insert(planRows);
         if (saveError) console.error('Error saving plans:', saveError);
+
+        // Save concepts and resources to goal
+        if (planData.concepts || planData.resources) {
+          await supabase
+            .from('learning_goals')
+            .update({
+              concepts: planData.concepts || [],
+              resources: planData.resources || [],
+            })
+            .eq('id', goal.id);
+        }
       }
 
       // Invalidate queries to refresh data

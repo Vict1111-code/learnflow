@@ -5,31 +5,19 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getLearningGoals, getGoalProgress } from '@/lib/database';
 import { supabase } from '@/integrations/supabase/client';
 import Layout from '@/components/Layout';
+import SkillTree, { ConceptNode } from '@/components/SkillTree';
+import ResourceList, { Resource } from '@/components/ResourceList';
 import { motion } from 'framer-motion';
 import {
-  ArrowLeft,
-  BookOpen,
-  Calendar,
-  Clock,
-  CheckCircle,
-  Circle,
-  Sparkles,
-  Target,
-  RefreshCw,
-  Loader2,
+  ArrowLeft, BookOpen, Calendar, Clock, CheckCircle, Circle, Sparkles,
+  Target, RefreshCw, Loader2, Trash2, Edit3, Save, X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
+import { Input } from '@/components/ui/input';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 
@@ -41,12 +29,17 @@ const blockColors: Record<string, string> = {
   review: 'bg-highlight/10 text-highlight border-highlight/20',
 };
 
-const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const methodologyBadges: Record<string, string> = {
+  explanation: 'bg-primary/10 text-primary',
+  example: 'bg-streak/10 text-streak',
+  exercise: 'bg-xp/10 text-xp',
+  'explain-to-others': 'bg-level/10 text-level',
+  review: 'bg-highlight/10 text-highlight',
+};
 
 function formatDuration(value: number | null, unit: string | null): string {
   if (!value || !unit) return 'Not set';
-  const plural = value > 1 ? 's' : '';
-  return `${value} ${unit}${plural}`;
+  return `${value} ${unit}${value > 1 ? 's' : ''}`;
 }
 
 export default function GoalDetail() {
@@ -55,6 +48,9 @@ export default function GoalDetail() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [editingBlock, setEditingBlock] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
 
   const { data: goals } = useQuery({
     queryKey: ['learning-goals', user?.id],
@@ -86,24 +82,137 @@ export default function GoalDetail() {
     enabled: !!user && !!id,
   });
 
-  const progressPercent = progress?.total
-    ? Math.round((progress.completed / progress.total) * 100)
-    : 0;
+  const progressPercent = progress?.total ? Math.round((progress.completed / progress.total) * 100) : 0;
+
+  // Parse concepts and resources from goal
+  const concepts: ConceptNode[] = (goal as any)?.concepts || [];
+  const resources: Resource[] = (goal as any)?.resources || [];
+  const conceptNames: Record<string, string> = {};
+  concepts.forEach(c => { conceptNames[c.id] = c.name; });
+
+  const handleToggleBlock = async (planId: string, blockId: string) => {
+    if (!user) return;
+    const plan = plans?.find(p => p.id === planId);
+    if (!plan) return;
+
+    const blocks = (plan.blocks as any[]) || [];
+    const updatedBlocks = blocks.map((b: any) =>
+      b.id === blockId ? { ...b, completed: !b.completed } : b
+    );
+
+    const { error } = await supabase
+      .from('study_plans')
+      .update({ blocks: updatedBlocks })
+      .eq('id', planId);
+
+    if (error) {
+      toast.error('Failed to update block');
+      return;
+    }
+
+    // Update concept status based on completed blocks
+    if (concepts.length > 0) {
+      await updateConceptStatuses(updatedBlocks, planId);
+    }
+
+    queryClient.invalidateQueries({ queryKey: ['goal-plans', id] });
+    queryClient.invalidateQueries({ queryKey: ['goal-progress', id] });
+  };
+
+  const updateConceptStatuses = async (updatedBlocks: any[], planId: string) => {
+    if (!goal || !user || concepts.length === 0) return;
+
+    // Get all plans to check completion across all days
+    const allPlans = plans?.map(p =>
+      p.id === planId ? { ...p, blocks: updatedBlocks } : p
+    ) || [];
+
+    // Check which concepts have all their blocks completed
+    const updatedConcepts = concepts.map(concept => {
+      // Find blocks associated with this concept
+      const conceptBlocks = allPlans.flatMap(p =>
+        ((p.blocks as any[]) || []).filter((b: any) => b.conceptId === concept.id)
+      );
+
+      const allCompleted = conceptBlocks.length > 0 && conceptBlocks.every((b: any) => b.completed);
+
+      let status: 'locked' | 'available' | 'completed' = concept.status;
+      if (allCompleted) {
+        status = 'completed';
+      } else {
+        // Check if prerequisites are met
+        const prereqsMet = concept.prerequisites.every(pid => {
+          const prereq = concepts.find(c => c.id === pid);
+          return prereq?.status === 'completed';
+        });
+        status = prereqsMet || concept.prerequisites.length === 0 ? 'available' : 'locked';
+      }
+
+      return { ...concept, status };
+    });
+
+    // Update locked statuses based on newly completed concepts
+    const finalConcepts = updatedConcepts.map(concept => {
+      if (concept.status === 'locked') {
+        const prereqsMet = concept.prerequisites.every(pid => {
+          const prereq = updatedConcepts.find(c => c.id === pid);
+          return prereq?.status === 'completed';
+        });
+        if (prereqsMet) return { ...concept, status: 'available' as const };
+      }
+      return concept;
+    });
+
+    await supabase
+      .from('learning_goals')
+      .update({ concepts: finalConcepts })
+      .eq('id', goal.id)
+      .eq('user_id', user.id);
+
+    queryClient.invalidateQueries({ queryKey: ['learning-goals'] });
+  };
+
+  const handleEditBlock = async (planId: string, blockId: string) => {
+    if (!user) return;
+    const plan = plans?.find(p => p.id === planId);
+    if (!plan) return;
+
+    const blocks = (plan.blocks as any[]) || [];
+    const updatedBlocks = blocks.map((b: any) =>
+      b.id === blockId ? { ...b, title: editTitle, description: editDescription } : b
+    );
+
+    const { error } = await supabase.from('study_plans').update({ blocks: updatedBlocks }).eq('id', planId);
+    if (error) { toast.error('Failed to update block'); return; }
+
+    setEditingBlock(null);
+    queryClient.invalidateQueries({ queryKey: ['goal-plans', id] });
+    toast.success('Block updated');
+  };
+
+  const handleDeleteBlock = async (planId: string, blockId: string) => {
+    if (!user) return;
+    const plan = plans?.find(p => p.id === planId);
+    if (!plan) return;
+
+    const blocks = (plan.blocks as any[]) || [];
+    const updatedBlocks = blocks.filter((b: any) => b.id !== blockId);
+
+    const { error } = await supabase.from('study_plans').update({ blocks: updatedBlocks }).eq('id', planId);
+    if (error) { toast.error('Failed to delete block'); return; }
+
+    queryClient.invalidateQueries({ queryKey: ['goal-plans', id] });
+    queryClient.invalidateQueries({ queryKey: ['goal-progress', id] });
+    toast.success('Block removed');
+  };
 
   const handleRegenerate = async () => {
     if (!user || !goal) return;
     setIsRegenerating(true);
 
     try {
-      // Delete existing plans for this goal
-      await supabase
-        .from('study_plans')
-        .delete()
-        .eq('goal_id', goal.id)
-        .eq('user_id', user.id);
+      await supabase.from('study_plans').delete().eq('goal_id', goal.id).eq('user_id', user.id);
 
-      // Call the edge function to generate new plans
-      const { data: sessionData } = await supabase.auth.getSession();
       const response = await supabase.functions.invoke('generate-study-plan', {
         body: {
           goalType: goal.goal_type,
@@ -120,29 +229,36 @@ export default function GoalDetail() {
       if (response.error) throw new Error(response.error.message);
 
       const studyPlan = response.data?.studyPlan;
-      if (!studyPlan || !Array.isArray(studyPlan)) {
-        throw new Error('Invalid study plan response');
-      }
+      const concepts = response.data?.concepts || [];
+      const resources = response.data?.resources || [];
 
-      // Save new plans
+      if (!studyPlan || !Array.isArray(studyPlan)) throw new Error('Invalid study plan response');
+
       const planRows = studyPlan.map((plan: any, index: number) => ({
         user_id: user.id,
         goal_id: goal.id,
         day_of_week: index,
-        blocks: plan.blocks || [],
+        blocks: (plan.blocks || []).map((b: any) => ({ ...b, conceptId: plan.conceptId || b.conceptId })),
       }));
 
       const { error: insertError } = await supabase.from('study_plans').insert(planRows);
       if (insertError) throw insertError;
 
-      // Refresh queries
+      // Save concepts and resources to goal
+      await supabase
+        .from('learning_goals')
+        .update({ concepts, resources })
+        .eq('id', goal.id)
+        .eq('user_id', user.id);
+
       queryClient.invalidateQueries({ queryKey: ['goal-plans', id] });
       queryClient.invalidateQueries({ queryKey: ['goal-progress', id] });
       queryClient.invalidateQueries({ queryKey: ['study-plans'] });
-      toast.success('Study plan regenerated successfully!');
+      queryClient.invalidateQueries({ queryKey: ['learning-goals'] });
+      toast.success('Study plan regenerated with concept tree!');
     } catch (error) {
       console.error('Error regenerating plan:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to regenerate study plan');
+      toast.error(error instanceof Error ? error.message : 'Failed to regenerate');
     } finally {
       setIsRegenerating(false);
     }
@@ -174,17 +290,11 @@ export default function GoalDetail() {
 
   return (
     <Layout>
-      <div className="space-y-8">
+      <div className="space-y-6">
         {/* Header */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate('/plan')}
-            className="mb-4 -ml-2 gap-1 text-muted-foreground"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Study Plan
+          <Button variant="ghost" size="sm" onClick={() => navigate('/plan')} className="mb-4 -ml-2 gap-1 text-muted-foreground">
+            <ArrowLeft className="h-4 w-4" /> Back to Study Plan
           </Button>
 
           <div className="glass-card rounded-xl p-6">
@@ -194,78 +304,47 @@ export default function GoalDetail() {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
-                  <h1 className="font-display text-2xl font-bold text-foreground">
-                    {goal.description}
-                  </h1>
+                  <h1 className="font-display text-2xl font-bold text-foreground">{goal.description}</h1>
                   {goal.is_active && (
-                    <span className="shrink-0 rounded-full bg-primary/20 px-2.5 py-0.5 text-xs font-semibold uppercase text-primary">
-                      Active
-                    </span>
+                    <span className="shrink-0 rounded-full bg-primary/20 px-2.5 py-0.5 text-xs font-semibold uppercase text-primary">Active</span>
                   )}
                 </div>
 
-                {/* Meta row */}
                 <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                  <span className="flex items-center gap-1.5">
-                    <Calendar className="h-4 w-4" />
-                    {formatDuration(goal.duration_value, goal.duration_unit)}
-                  </span>
+                  <span className="flex items-center gap-1.5"><Calendar className="h-4 w-4" />{formatDuration(goal.duration_value, goal.duration_unit)}</span>
                   <span className="flex items-center gap-1.5">
                     <Clock className="h-4 w-4" />
-                    {goal.time_availability === 'custom'
-                      ? `${goal.custom_hours}h/day`
-                      : `${goal.time_availability}h/day`}
+                    {goal.time_availability === 'custom' ? `${goal.custom_hours}h/day` : `${goal.time_availability}h/day`}
                   </span>
-                  <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium capitalize">
-                    {goal.mastery_level}
-                  </span>
-                  <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium capitalize">
-                    {goal.goal_type}
-                  </span>
+                  <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium capitalize">{goal.mastery_level}</span>
+                  <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium capitalize">{goal.goal_type}</span>
                 </div>
 
-                {/* Progress */}
                 <div className="mt-4 space-y-1.5">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Overall Progress</span>
                     <span className="font-semibold text-foreground">{progressPercent}%</span>
                   </div>
                   <Progress value={progressPercent} className="h-2.5" />
-                  <p className="text-xs text-muted-foreground">
-                    {progress?.completed || 0} of {progress?.total || 0} study blocks completed
-                  </p>
+                  <p className="text-xs text-muted-foreground">{progress?.completed || 0} of {progress?.total || 0} blocks completed</p>
                 </div>
 
-                {/* Regenerate button */}
                 <div className="mt-4">
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={isRegenerating}
-                        className="gap-2"
-                      >
-                        {isRegenerating ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <RefreshCw className="h-4 w-4" />
-                        )}
+                      <Button variant="outline" size="sm" disabled={isRegenerating} className="gap-2">
+                        {isRegenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
                         {isRegenerating ? 'Regenerating...' : 'Regenerate Plan'}
                       </Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>
                         <AlertDialogTitle>Regenerate Study Plan?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This will replace your current study plan with a freshly generated one. All progress on existing blocks will be lost.
-                        </AlertDialogDescription>
+                        <AlertDialogDescription>This will replace your current plan and concept tree. All progress will be lost.</AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleRegenerate}>
-                          Regenerate
-                        </AlertDialogAction>
+                        <AlertDialogAction onClick={handleRegenerate}>Regenerate</AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
@@ -275,15 +354,20 @@ export default function GoalDetail() {
           </div>
         </motion.div>
 
+        {/* Skill Tree */}
+        <SkillTree concepts={concepts} />
+
+        {/* Resources */}
+        <ResourceList resources={resources} conceptNames={conceptNames} />
+
         {/* Legend */}
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-2">
           {Object.entries(blockColors).map(([type, cls]) => (
-            <span
-              key={type}
-              className={`rounded-full border px-3 py-1 text-xs font-medium capitalize ${cls}`}
-            >
-              {type}
-            </span>
+            <span key={type} className={`rounded-full border px-3 py-1 text-xs font-medium capitalize ${cls}`}>{type}</span>
+          ))}
+          <span className="ml-2 text-xs text-muted-foreground">|</span>
+          {Object.entries(methodologyBadges).map(([method, cls]) => (
+            <span key={method} className={`rounded-full px-2.5 py-1 text-[10px] font-medium capitalize ${cls}`}>4E: {method}</span>
           ))}
         </div>
 
@@ -292,7 +376,7 @@ export default function GoalDetail() {
           <div className="flex min-h-[30vh] items-center justify-center">
             <div className="text-center">
               <BookOpen className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
-              <p className="text-muted-foreground">No study plans generated for this goal yet.</p>
+              <p className="text-muted-foreground">No study plans generated yet.</p>
             </div>
           </div>
         ) : (
@@ -314,53 +398,83 @@ export default function GoalDetail() {
                     <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-primary">
                       <BookOpen className="h-5 w-5 text-primary-foreground" />
                     </div>
-                    <div>
-                      <h2 className="font-display text-lg font-semibold text-foreground">
-                        {dayNames[plan.day_of_week]}
-                      </h2>
-                      <p className="text-xs text-muted-foreground">
-                        {totalDuration} min total • {completedCount}/{blocks.length} done
-                      </p>
+                    <div className="flex-1">
+                      <h2 className="font-display text-lg font-semibold text-foreground">Day {plan.day_of_week + 1}</h2>
+                      <p className="text-xs text-muted-foreground">{totalDuration} min • {completedCount}/{blocks.length} done</p>
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    {blocks.map((block: any) => (
-                      <div
-                        key={block.id}
-                        className={`flex items-center gap-4 rounded-lg border px-4 py-3 transition-all ${
-                          block.completed
-                            ? 'border-xp/20 bg-xp/5 opacity-60'
-                            : 'border-border bg-muted/20'
-                        }`}
-                      >
-                        {block.completed ? (
-                          <CheckCircle className="h-5 w-5 shrink-0 text-xp" />
-                        ) : (
-                          <Circle className="h-5 w-5 shrink-0 text-muted-foreground" />
-                        )}
-                        <div className="flex-1">
-                          <p
-                            className={`text-sm font-medium ${
-                              block.completed
-                                ? 'line-through text-muted-foreground'
-                                : 'text-foreground'
-                            }`}
-                          >
-                            {block.title}
-                          </p>
-                          <p className="text-xs text-muted-foreground">{block.description}</p>
-                        </div>
-                        <span
-                          className={`rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase ${
-                            blockColors[block.type] || 'bg-muted text-muted-foreground'
+                    {blocks.map((block: any) => {
+                      const isEditing = editingBlock === block.id;
+
+                      return (
+                        <div
+                          key={block.id}
+                          className={`flex items-center gap-3 rounded-lg border px-4 py-3 transition-all ${
+                            block.completed ? 'border-xp/20 bg-xp/5 opacity-60' : 'border-border bg-muted/20'
                           }`}
                         >
-                          {block.type}
-                        </span>
-                        <span className="text-xs text-muted-foreground">{block.duration}m</span>
-                      </div>
-                    ))}
+                          <button onClick={() => handleToggleBlock(plan.id, block.id)} className="shrink-0">
+                            {block.completed ? (
+                              <CheckCircle className="h-5 w-5 text-xp" />
+                            ) : (
+                              <Circle className="h-5 w-5 text-muted-foreground hover:text-primary transition-colors" />
+                            )}
+                          </button>
+
+                          {isEditing ? (
+                            <div className="flex-1 space-y-1">
+                              <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="h-7 text-sm" />
+                              <Input value={editDescription} onChange={(e) => setEditDescription(e.target.value)} className="h-7 text-xs" />
+                            </div>
+                          ) : (
+                            <div className="flex-1 min-w-0">
+                              <p className={`text-sm font-medium ${block.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+                                {block.title}
+                              </p>
+                              <p className="text-xs text-muted-foreground">{block.description}</p>
+                            </div>
+                          )}
+
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase ${blockColors[block.type] || 'bg-muted text-muted-foreground'}`}>
+                              {block.type}
+                            </span>
+                            {block.methodology && (
+                              <span className={`rounded-full px-2 py-0.5 text-[9px] font-medium ${methodologyBadges[block.methodology] || ''}`}>
+                                {block.methodology === 'explain-to-others' ? 'E2O' : block.methodology?.slice(0, 3)}
+                              </span>
+                            )}
+                            <span className="text-xs text-muted-foreground">{block.duration}m</span>
+
+                            {isEditing ? (
+                              <>
+                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleEditBlock(plan.id, block.id)}>
+                                  <Save className="h-3 w-3" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setEditingBlock(null)}>
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </>
+                            ) : (
+                              <>
+                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => {
+                                  setEditingBlock(block.id);
+                                  setEditTitle(block.title);
+                                  setEditDescription(block.description);
+                                }}>
+                                  <Edit3 className="h-3 w-3" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => handleDeleteBlock(plan.id, block.id)}>
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </motion.div>
               );

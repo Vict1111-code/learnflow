@@ -2,27 +2,13 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// Valid enum values for input validation
 const VALID_GOAL_TYPES = ['skill', 'concept', 'topic', 'subject', 'habit'] as const;
 const VALID_MASTERY_LEVELS = ['awareness', 'understanding', 'application', 'mastery'] as const;
 const VALID_TIME_AVAILABILITY = ['1-2', '3-5', '6-8', 'custom'] as const;
 const VALID_DURATION_UNITS = ['day', 'week', 'month', 'year'] as const;
-
-interface StudyBlock {
-  id: string;
-  type: string;
-  title: string;
-  duration: number;
-  description: string;
-}
-
-interface StudyPlan {
-  day: string;
-  blocks: StudyBlock[];
-}
 
 interface PlanDuration {
   value: number;
@@ -38,7 +24,6 @@ interface StudyPlanRequest {
   duration?: PlanDuration;
 }
 
-// Input validation function
 function validateInput(body: unknown): { valid: true; data: StudyPlanRequest } | { valid: false; error: string } {
   if (!body || typeof body !== 'object') {
     return { valid: false, error: 'Request body must be a JSON object' };
@@ -46,69 +31,34 @@ function validateInput(body: unknown): { valid: true; data: StudyPlanRequest } |
 
   const { goalType, description, masteryLevel, timeAvailability, customHours, duration } = body as Record<string, unknown>;
 
-  // Validate goalType
-  if (!goalType || typeof goalType !== 'string') {
-    return { valid: false, error: 'goalType is required and must be a string' };
-  }
-  if (!VALID_GOAL_TYPES.includes(goalType as typeof VALID_GOAL_TYPES[number])) {
+  if (!goalType || typeof goalType !== 'string' || !VALID_GOAL_TYPES.includes(goalType as any)) {
     return { valid: false, error: `goalType must be one of: ${VALID_GOAL_TYPES.join(', ')}` };
   }
-
-  // Validate description
   if (!description || typeof description !== 'string') {
-    return { valid: false, error: 'description is required and must be a string' };
+    return { valid: false, error: 'description is required' };
   }
   const trimmedDescription = description.trim();
-  if (trimmedDescription.length < 10) {
-    return { valid: false, error: 'description must be at least 10 characters' };
+  if (trimmedDescription.length < 10 || trimmedDescription.length > 500) {
+    return { valid: false, error: 'description must be 10-500 characters' };
   }
-  if (trimmedDescription.length > 500) {
-    return { valid: false, error: 'description must be at most 500 characters' };
-  }
-
-  // Validate masteryLevel
-  if (!masteryLevel || typeof masteryLevel !== 'string') {
-    return { valid: false, error: 'masteryLevel is required and must be a string' };
-  }
-  if (!VALID_MASTERY_LEVELS.includes(masteryLevel as typeof VALID_MASTERY_LEVELS[number])) {
+  if (!masteryLevel || typeof masteryLevel !== 'string' || !VALID_MASTERY_LEVELS.includes(masteryLevel as any)) {
     return { valid: false, error: `masteryLevel must be one of: ${VALID_MASTERY_LEVELS.join(', ')}` };
   }
-
-  // Validate timeAvailability
-  if (!timeAvailability || typeof timeAvailability !== 'string') {
-    return { valid: false, error: 'timeAvailability is required and must be a string' };
-  }
-  if (!VALID_TIME_AVAILABILITY.includes(timeAvailability as typeof VALID_TIME_AVAILABILITY[number])) {
+  if (!timeAvailability || typeof timeAvailability !== 'string' || !VALID_TIME_AVAILABILITY.includes(timeAvailability as any)) {
     return { valid: false, error: `timeAvailability must be one of: ${VALID_TIME_AVAILABILITY.join(', ')}` };
   }
-
-  // Validate customHours when timeAvailability is 'custom'
   if (timeAvailability === 'custom') {
-    if (customHours === undefined || customHours === null) {
-      return { valid: false, error: 'customHours is required when timeAvailability is custom' };
-    }
-    if (typeof customHours !== 'number' || !Number.isInteger(customHours)) {
-      return { valid: false, error: 'customHours must be an integer' };
-    }
-    if (customHours < 1 || customHours > 24) {
-      return { valid: false, error: 'customHours must be between 1 and 24' };
+    if (typeof customHours !== 'number' || customHours < 1 || customHours > 24) {
+      return { valid: false, error: 'customHours must be 1-24 when timeAvailability is custom' };
     }
   }
 
-  // Validate duration (optional, defaults to 1 week)
   let validatedDuration: PlanDuration = { value: 1, unit: 'week' };
-  if (duration !== undefined && duration !== null) {
-    if (typeof duration !== 'object') {
-      return { valid: false, error: 'duration must be an object with value and unit' };
+  if (duration && typeof duration === 'object') {
+    const { value: dv, unit: du } = duration as Record<string, unknown>;
+    if (typeof dv === 'number' && dv >= 1 && dv <= 365 && typeof du === 'string' && VALID_DURATION_UNITS.includes(du as any)) {
+      validatedDuration = { value: dv, unit: du as PlanDuration['unit'] };
     }
-    const { value: durationValue, unit: durationUnit } = duration as Record<string, unknown>;
-    if (typeof durationValue !== 'number' || durationValue < 1 || durationValue > 365) {
-      return { valid: false, error: 'duration.value must be a number between 1 and 365' };
-    }
-    if (!durationUnit || typeof durationUnit !== 'string' || !VALID_DURATION_UNITS.includes(durationUnit as typeof VALID_DURATION_UNITS[number])) {
-      return { valid: false, error: `duration.unit must be one of: ${VALID_DURATION_UNITS.join(', ')}` };
-    }
-    validatedDuration = { value: durationValue, unit: durationUnit as PlanDuration['unit'] };
   }
 
   return {
@@ -130,13 +80,9 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Authentication check
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return new Response(
-        JSON.stringify({ error: 'Missing or invalid authorization header' }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const supabaseClient = createClient(
@@ -145,58 +91,29 @@ Deno.serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    // Verify user authentication
     const token = authHeader.replace('Bearer ', '');
     const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
-    
     if (claimsError || !claimsData?.claims) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized - invalid token' }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const userId = claimsData.claims.sub;
-    if (!userId) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized - no user ID in token' }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Parse and validate input
     let body: unknown;
-    try {
-      body = await req.json();
-    } catch {
-      return new Response(
-        JSON.stringify({ error: 'Invalid JSON in request body' }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    try { body = await req.json(); } catch {
+      return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const validationResult = validateInput(body);
     if (!validationResult.valid) {
-      return new Response(
-        JSON.stringify({ error: validationResult.error }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: validationResult.error }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const { goalType, description, masteryLevel, timeAvailability, customHours, duration } = validationResult.data;
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
-    }
+    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const hoursPerDay = timeAvailability === 'custom' 
-      ? customHours! 
-      : timeAvailability === '1-2' ? 1.5 
-      : timeAvailability === '3-5' ? 4 
-      : 7;
+    const hoursPerDay = timeAvailability === 'custom' ? customHours! : timeAvailability === '1-2' ? 1.5 : timeAvailability === '3-5' ? 4 : 7;
 
-    // Calculate total days based on duration
     const durationToDays = (d: PlanDuration): number => {
       switch (d.unit) {
         case 'day': return d.value;
@@ -206,36 +123,32 @@ Deno.serve(async (req) => {
         default: return 7;
       }
     };
-    
-    const totalDays = Math.min(durationToDays(duration!), 365); // Cap at 1 year
+
+    const totalDays = Math.min(durationToDays(duration!), 365);
     const durationLabel = `${duration!.value} ${duration!.unit}${duration!.value > 1 ? 's' : ''}`;
 
-    const systemPrompt = `You are an expert learning coach that creates personalized study plans. 
-You follow the 4Es principle (Engage, Explore, Explain, Execute) and use 5 learning blocks:
-- input: Consume new information (videos, reading, lectures)
-- breakdown: Break down and analyze concepts
-- practice: Hands-on exercises and drills
-- output: Create something (write, build, teach)
-- review: Spaced repetition and reflection
-
-Create study plans that are:
-- Balanced across all 5 blocks
-- Time-blocked appropriately
-- Progressive throughout the plan duration
-- Focused on active learning over passive consumption
-- Adapted to the specified duration (${durationLabel})`;
-
-    // Sanitize description for prompt injection prevention
-    const sanitizedDescription = description
-      .replace(/[<>]/g, '') // Remove potential HTML/XML tags
-      .replace(/\n{3,}/g, '\n\n') // Limit consecutive newlines
-      .substring(0, 500); // Ensure max length
-
-    // Determine number of plan entries based on duration
-    const planEntries = Math.min(totalDays, 30); // Max 30 entries for longer plans
+    const sanitizedDescription = description.replace(/[<>]/g, '').replace(/\n{3,}/g, '\n\n').substring(0, 500);
+    const planEntries = Math.min(totalDays, 30);
     const dayInterval = totalDays > 30 ? Math.ceil(totalDays / 30) : 1;
-    
-    const userPrompt = `Create a study plan for someone learning over ${durationLabel}:
+
+    const systemPrompt = `You are an expert learning coach. You create structured study plans using the 4Es methodology and 5 learning blocks.
+
+The 4Es methodology:
+1. Explanation - Learn and understand concepts through reading, videos, lectures
+2. Example - Study worked examples and case studies
+3. Exercise - Practice with hands-on problems and drills
+4. Explain-to-others - Teach, write about, or present what you learned
+
+The 5 learning blocks map to these:
+- input: Consume new information (maps to Explanation)
+- breakdown: Analyze concepts with examples (maps to Example)
+- practice: Hands-on exercises and drills (maps to Exercise)
+- output: Create, teach, or explain to others (maps to Explain-to-others)
+- review: Spaced repetition, reflection, self-assessment
+
+You also identify concept dependencies — what concepts must be learned before others.`;
+
+    const userPrompt = `Create a comprehensive study plan for learning over ${durationLabel}:
 
 Goal Type: ${goalType}
 Description: ${sanitizedDescription}
@@ -243,22 +156,41 @@ Target Mastery Level: ${masteryLevel}
 Available Time: ${hoursPerDay} hours per day
 Total Duration: ${durationLabel} (${totalDays} days)
 
-Return a JSON array with ${planEntries} objects. ${totalDays > 30 
-  ? `Since this is a long-term plan, create entries for key milestone days (every ${dayInterval} days approximately).`
-  : `Create one entry for each day.`
-} Each entry should have:
-- day: string (e.g., "Day 1", "Day 7", "Week 2", etc.)
-- blocks: array of study blocks with:
-  - id: unique string
-  - type: one of "input", "breakdown", "practice", "output", "review"
-  - title: specific task title related to their goal
-  - duration: minutes (total should roughly equal ${hoursPerDay * 60} minutes)
-  - description: brief description of what to do
+Return a JSON object with TWO keys:
 
-Make the plan specific to their goal: "${sanitizedDescription}"
-Adapt difficulty based on mastery level: ${masteryLevel}
+1. "concepts" - An array of concept nodes for a dependency graph. Each concept:
+   - id: unique string (e.g., "c1", "c2")
+   - name: short concept name
+   - description: one-line description
+   - prerequisites: array of concept ids that must be completed first (empty for foundational concepts)
+   - status: "locked" (has unmet prerequisites) or "available" (no prerequisites or all met)
+   - tier: number (0 for foundational, 1 for next level, etc.) — represents depth in the dependency tree
+   - dayRange: string (e.g., "Day 1-3") — when this concept appears in the plan
 
-Return ONLY the JSON array, no other text.`;
+Generate 8-15 concepts that form a meaningful prerequisite tree for "${sanitizedDescription}".
+
+2. "studyPlan" - An array with ${planEntries} day objects. ${totalDays > 30 ? `Create entries for key milestone days (every ${dayInterval} days).` : `One entry per day.`} Each:
+   - day: string (e.g., "Day 1", "Week 2")
+   - conceptId: the concept id this day focuses on
+   - blocks: array of study blocks with:
+     - id: unique string
+     - type: one of "input", "breakdown", "practice", "output", "review"
+     - title: specific task title
+     - duration: minutes (total ≈ ${hoursPerDay * 60} minutes)
+     - description: what to do
+     - methodology: which of the 4Es this maps to ("explanation", "example", "exercise", "explain-to-others", or "review")
+
+3. "resources" - An array of 5-10 free learning resources. Each:
+   - title: resource name
+   - url: direct URL to the resource
+   - type: "article" | "video" | "documentation" | "book" | "course" | "tool"
+   - conceptId: which concept this resource is most relevant to
+   - description: one-line description
+
+Make the plan specific to: "${sanitizedDescription}"
+Adapt difficulty for mastery level: ${masteryLevel}
+
+Return ONLY valid JSON, no markdown or other text.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -278,54 +210,55 @@ Return ONLY the JSON array, no other text.`;
     if (!response.ok) {
       const errorText = await response.text();
       console.error("AI gateway error:", response.status, errorText);
-      
       if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
       if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "AI usage limit reached. Please add credits to continue." }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return new Response(JSON.stringify({ error: "AI usage limit reached. Please add credits." }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
-      
       throw new Error(`AI gateway error: ${response.status}`);
     }
 
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content;
+    if (!content) throw new Error("No content in AI response");
 
-    if (!content) {
-      throw new Error("No content in AI response");
-    }
-
-    // Parse the JSON from the response
-    let studyPlan: StudyPlan[];
+    let parsed: any;
     try {
-      // Try to extract JSON from the response (handles markdown code blocks)
-      const jsonMatch = content.match(/\[[\s\S]*\]/);
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        studyPlan = JSON.parse(jsonMatch[0]);
+        parsed = JSON.parse(jsonMatch[0]);
       } else {
-        studyPlan = JSON.parse(content);
+        parsed = JSON.parse(content);
       }
     } catch (parseError) {
-      console.error("Failed to parse AI response:", content);
-      throw new Error("Failed to parse study plan from AI response");
+      // Fallback: try to find array (old format)
+      try {
+        const arrayMatch = content.match(/\[[\s\S]*\]/);
+        if (arrayMatch) {
+          const studyPlan = JSON.parse(arrayMatch[0]);
+          parsed = { studyPlan, concepts: [], resources: [] };
+        } else {
+          throw parseError;
+        }
+      } catch {
+        console.error("Failed to parse AI response:", content);
+        throw new Error("Failed to parse study plan");
+      }
     }
 
     return new Response(
-      JSON.stringify({ studyPlan }),
+      JSON.stringify({
+        studyPlan: parsed.studyPlan || parsed,
+        concepts: parsed.concepts || [],
+        resources: parsed.resources || [],
+      }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
     console.error("Error generating study plan:", error);
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
     return new Response(
-      JSON.stringify({ error: errorMessage }),
+      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
