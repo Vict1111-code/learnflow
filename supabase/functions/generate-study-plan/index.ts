@@ -38,8 +38,8 @@ function validateInput(body: unknown): { valid: true; data: StudyPlanRequest } |
     return { valid: false, error: 'description is required' };
   }
   const trimmedDescription = description.trim();
-  if (trimmedDescription.length < 10 || trimmedDescription.length > 500) {
-    return { valid: false, error: 'description must be 10-500 characters' };
+  if (trimmedDescription.length < 3 || trimmedDescription.length > 500) {
+    return { valid: false, error: 'description must be 3-500 characters' };
   }
   if (!masteryLevel || typeof masteryLevel !== 'string' || !VALID_MASTERY_LEVELS.includes(masteryLevel as any)) {
     return { valid: false, error: `masteryLevel must be one of: ${VALID_MASTERY_LEVELS.join(', ')}` };
