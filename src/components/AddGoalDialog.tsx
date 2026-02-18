@@ -73,6 +73,10 @@ export default function AddGoalDialog({ onGoalAdded }: AddGoalDialogProps) {
       toast.error('Please enter a description for your goal');
       return;
     }
+    if (description.trim().length < 10) {
+      toast.error('Description must be at least 10 characters');
+      return;
+    }
 
     setIsLoading(true);
 
@@ -193,11 +197,15 @@ export default function AddGoalDialog({ onGoalAdded }: AddGoalDialogProps) {
           <div className="space-y-2">
             <Label>Describe your learning goal</Label>
             <Textarea
-              placeholder="E.g., Learn React and build a full-stack web application..."
+              placeholder="E.g., Learn React and build a full-stack web application with TypeScript..."
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={(e) => setDescription(e.target.value.slice(0, 500))}
               className="min-h-[100px]"
             />
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>{description.trim().length < 10 && description.length > 0 ? <span className="text-destructive">Minimum 10 characters required</span> : 'Be specific — describe what you want to learn and why'}</span>
+              <span className={description.length > 450 ? 'text-amber-500' : ''}>{description.length}/500</span>
+            </div>
           </div>
 
           {/* Mastery Level */}
@@ -280,7 +288,7 @@ export default function AddGoalDialog({ onGoalAdded }: AddGoalDialogProps) {
           {/* Submit Button */}
           <Button
             onClick={handleSubmit}
-            disabled={isLoading || !description.trim()}
+            disabled={isLoading || description.trim().length < 10}
             className="w-full gap-2 bg-gradient-primary hover:opacity-90"
           >
             {isLoading ? (
