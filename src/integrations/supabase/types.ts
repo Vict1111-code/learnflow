@@ -89,6 +89,39 @@ export type Database = {
         }
         Relationships: []
       }
+      focus_integrity_scores: {
+        Row: {
+          calculated_at: string
+          completion_rate: number
+          consistency_score: number
+          id: string
+          interruption_score: number
+          proof_quality_score: number
+          score: number
+          user_id: string
+        }
+        Insert: {
+          calculated_at?: string
+          completion_rate?: number
+          consistency_score?: number
+          id?: string
+          interruption_score?: number
+          proof_quality_score?: number
+          score?: number
+          user_id: string
+        }
+        Update: {
+          calculated_at?: string
+          completion_rate?: number
+          consistency_score?: number
+          id?: string
+          interruption_score?: number
+          proof_quality_score?: number
+          score?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       learning_goals: {
         Row: {
           concepts: Json | null
@@ -284,38 +317,61 @@ export type Database = {
       study_sessions: {
         Row: {
           block_type: string
+          concept_id: string | null
           created_at: string
           duration_seconds: number
           ended_at: string | null
+          goal_id: string | null
           id: string
+          interruptions: number
+          notes: string | null
           started_at: string
+          target_duration_seconds: number | null
           topic: string
           user_id: string
           xp_earned: number
         }
         Insert: {
           block_type: string
+          concept_id?: string | null
           created_at?: string
           duration_seconds?: number
           ended_at?: string | null
+          goal_id?: string | null
           id?: string
+          interruptions?: number
+          notes?: string | null
           started_at?: string
+          target_duration_seconds?: number | null
           topic: string
           user_id: string
           xp_earned?: number
         }
         Update: {
           block_type?: string
+          concept_id?: string | null
           created_at?: string
           duration_seconds?: number
           ended_at?: string | null
+          goal_id?: string | null
           id?: string
+          interruptions?: number
+          notes?: string | null
           started_at?: string
+          target_duration_seconds?: number | null
           topic?: string
           user_id?: string
           xp_earned?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "study_sessions_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "learning_goals"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -326,6 +382,7 @@ export type Database = {
         Args: { p_user_id: string; p_xp: number }
         Returns: undefined
       }
+      calculate_focus_integrity: { Args: { p_user_id: string }; Returns: Json }
       get_leaderboard: {
         Args: never
         Returns: {

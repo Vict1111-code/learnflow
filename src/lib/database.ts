@@ -25,32 +25,10 @@ export interface LearningGoal {
   duration_value: number | null;
   duration_unit: string | null;
   is_active: boolean;
+  concepts?: any;
+  resources?: any;
   created_at: string;
   updated_at: string;
-}
-
-// Get all learning goals for a user
-export async function getLearningGoals(userId: string): Promise<LearningGoal[]> {
-  const { data, error } = await supabase
-    .from('learning_goals')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false });
-  
-  if (error) throw error;
-  return data || [];
-}
-
-// Get study plans with their associated goals
-export async function getStudyPlansWithGoals(userId: string) {
-  const { data: plans, error: plansError } = await supabase
-    .from('study_plans')
-    .select('*, learning_goals(*)')
-    .eq('user_id', userId)
-    .order('day_of_week', { ascending: true });
-  
-  if (plansError) throw plansError;
-  return plans || [];
 }
 
 export interface StudySession {
@@ -62,6 +40,11 @@ export interface StudySession {
   started_at: string;
   ended_at: string | null;
   xp_earned: number;
+  goal_id: string | null;
+  concept_id: string | null;
+  notes: string | null;
+  interruptions: number;
+  target_duration_seconds: number | null;
   created_at: string;
 }
 
@@ -90,6 +73,14 @@ export interface CommunityPost {
   updated_at: string;
 }
 
+export interface FocusIntegrityScore {
+  score: number;
+  consistency: number;
+  completion: number;
+  interruption: number;
+  proofQuality: number;
+}
+
 // Profile functions
 export async function getProfile(userId: string): Promise<Profile | null> {
   const { data, error } = await supabase
@@ -115,7 +106,18 @@ export async function updateProfile(userId: string, updates: Partial<Profile>) {
 }
 
 // Learning goals functions
-export async function createLearningGoal(goal: Omit<LearningGoal, 'id' | 'created_at' | 'updated_at'>) {
+export async function getLearningGoals(userId: string): Promise<LearningGoal[]> {
+  const { data, error } = await supabase
+    .from('learning_goals')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+  
+  if (error) throw error;
+  return data || [];
+}
+
+export async function createLearningGoal(goal: Omit<LearningGoal, 'id' | 'created_at' | 'updated_at' | 'concepts' | 'resources'>) {
   const { data, error } = await supabase
     .from('learning_goals')
     .insert(goal)
@@ -126,9 +128,7 @@ export async function createLearningGoal(goal: Omit<LearningGoal, 'id' | 'create
   return data;
 }
 
-// Delete a learning goal and its associated study plans
 export async function deleteLearningGoal(goalId: string, userId: string) {
-  // First delete associated study plans
   const { error: plansError } = await supabase
     .from('study_plans')
     .delete()
@@ -137,7 +137,6 @@ export async function deleteLearningGoal(goalId: string, userId: string) {
   
   if (plansError) throw plansError;
   
-  // Then delete the goal
   const { error: goalError } = await supabase
     .from('learning_goals')
     .delete()
@@ -147,7 +146,6 @@ export async function deleteLearningGoal(goalId: string, userId: string) {
   if (goalError) throw goalError;
 }
 
-// Toggle goal active status
 export async function toggleGoalActive(goalId: string, userId: string, isActive: boolean) {
   const { data, error } = await supabase
     .from('learning_goals')
@@ -161,9 +159,7 @@ export async function toggleGoalActive(goalId: string, userId: string, isActive:
   return data;
 }
 
-// Set a specific goal as the active one (deactivates others)
 export async function setActiveGoal(goalId: string, userId: string) {
-  // First deactivate all goals for this user
   const { error: deactivateError } = await supabase
     .from('learning_goals')
     .update({ is_active: false })
@@ -171,7 +167,6 @@ export async function setActiveGoal(goalId: string, userId: string) {
   
   if (deactivateError) throw deactivateError;
   
-  // Then activate the selected goal
   const { data, error } = await supabase
     .from('learning_goals')
     .update({ is_active: true })
@@ -184,7 +179,6 @@ export async function setActiveGoal(goalId: string, userId: string) {
   return data;
 }
 
-// Get goal progress (completed blocks / total blocks)
 export async function getGoalProgress(goalId: string, userId: string): Promise<{ completed: number; total: number }> {
   const { data: plans, error } = await supabase
     .from('study_plans')
@@ -219,15 +213,35 @@ export async function getActiveGoal(userId: string): Promise<LearningGoal | null
   return data;
 }
 
+export async function getStudyPlansWithGoals(userId: string) {
+  const { data: plans, error: plansError } = await supabase
+    .from('study_plans')
+    .select('*, learning_goals(*)')
+    .eq('user_id', userId)
+    .order('day_of_week', { ascending: true });
+  
+  if (plansError) throw plansError;
+  return plans || [];
+}
+
 // Study sessions functions
-export async function startStudySession(userId: string, topic: string, blockType: string) {
+export async function startStudySession(
+  userId: string,
+  topic: string,
+  blockType: string,
+  options?: { goalId?: string; conceptId?: string; notes?: string; targetDuration?: number }
+) {
   const { data, error } = await supabase
     .from('study_sessions')
     .insert({
       user_id: userId,
       topic,
       block_type: blockType,
-    })
+      goal_id: options?.goalId || null,
+      concept_id: options?.conceptId || null,
+      notes: options?.notes || null,
+      target_duration_seconds: options?.targetDuration || null,
+    } as any)
     .select()
     .single();
   
@@ -235,13 +249,18 @@ export async function startStudySession(userId: string, topic: string, blockType
   return data;
 }
 
-export async function endStudySession(sessionId: string, durationSeconds: number) {
+export async function endStudySession(sessionId: string, durationSeconds: number, interruptions?: number) {
+  const updateData: any = {
+    ended_at: new Date().toISOString(),
+    duration_seconds: durationSeconds,
+  };
+  if (interruptions !== undefined) {
+    updateData.interruptions = interruptions;
+  }
+
   const { data, error } = await supabase
     .from('study_sessions')
-    .update({
-      ended_at: new Date().toISOString(),
-      duration_seconds: durationSeconds,
-    })
+    .update(updateData)
     .eq('id', sessionId)
     .select()
     .single();
@@ -261,6 +280,26 @@ export async function getTodaySessions(userId: string) {
   
   if (error) throw error;
   return data || [];
+}
+
+export async function getSessionHistory(userId: string, limit = 20) {
+  const { data, error } = await supabase
+    .from('study_sessions')
+    .select('*')
+    .eq('user_id', userId)
+    .not('ended_at', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  
+  if (error) throw error;
+  return data || [];
+}
+
+// Focus Integrity Score
+export async function getFocusIntegrityScore(userId: string): Promise<FocusIntegrityScore> {
+  const { data, error } = await supabase.rpc('calculate_focus_integrity', { p_user_id: userId });
+  if (error) throw error;
+  return data as unknown as FocusIntegrityScore;
 }
 
 // Daily reports functions
@@ -307,7 +346,7 @@ export async function getPosts(filter?: string) {
     .order('created_at', { ascending: false });
   
   if (filter && filter !== 'All') {
-    const postType = filter.toLowerCase().slice(0, -1); // Remove 's' from end
+    const postType = filter.toLowerCase().slice(0, -1);
     query = query.eq('post_type', postType);
   }
   
@@ -317,7 +356,6 @@ export async function getPosts(filter?: string) {
 }
 
 export async function toggleUpvote(postId: string, userId: string) {
-  // Check if already upvoted
   const { data: existing } = await supabase
     .from('post_upvotes')
     .select('id')
@@ -326,17 +364,13 @@ export async function toggleUpvote(postId: string, userId: string) {
     .maybeSingle();
   
   if (existing) {
-    // Remove upvote
     await supabase.from('post_upvotes').delete().eq('id', existing.id);
-    // Decrement upvotes count
     const { data: post } = await supabase.from('community_posts').select('upvotes').eq('id', postId).single();
     if (post) {
       await supabase.from('community_posts').update({ upvotes: Math.max(0, post.upvotes - 1) }).eq('id', postId);
     }
   } else {
-    // Add upvote
     await supabase.from('post_upvotes').insert({ post_id: postId, user_id: userId });
-    // Increment upvotes count
     const { data: post } = await supabase.from('community_posts').select('upvotes').eq('id', postId).single();
     if (post) {
       await supabase.from('community_posts').update({ upvotes: post.upvotes + 1 }).eq('id', postId);
@@ -358,11 +392,8 @@ export async function getLeaderboard() {
 
 // Study plans
 export async function saveStudyPlans(userId: string, goalId: string, plans: any[]) {
-  // Delete existing plans for this user
   await supabase.from('study_plans').delete().eq('user_id', userId);
   
-  // Insert new plans
-  const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
   const planRows = plans.map((plan, index) => ({
     user_id: userId,
     goal_id: goalId,
@@ -383,4 +414,57 @@ export async function getStudyPlans(userId: string) {
   
   if (error) throw error;
   return data || [];
+}
+
+// Recent activity feed
+export async function getRecentActivity(userId: string, limit = 5) {
+  const [sessions, reports] = await Promise.all([
+    supabase
+      .from('study_sessions')
+      .select('id, topic, xp_earned, created_at, duration_seconds, block_type')
+      .eq('user_id', userId)
+      .not('ended_at', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(limit),
+    supabase
+      .from('daily_reports')
+      .select('id, studied, xp_earned, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(limit),
+  ]);
+
+  const activities: Array<{
+    id: string;
+    type: 'session' | 'report';
+    title: string;
+    xp: number;
+    created_at: string;
+    meta?: string;
+  }> = [];
+
+  (sessions.data || []).forEach(s => {
+    activities.push({
+      id: s.id,
+      type: 'session',
+      title: s.topic,
+      xp: s.xp_earned,
+      created_at: s.created_at,
+      meta: `${Math.round(s.duration_seconds / 60)}min • ${s.block_type}`,
+    });
+  });
+
+  (reports.data || []).forEach(r => {
+    activities.push({
+      id: r.id,
+      type: 'report',
+      title: r.studied,
+      xp: r.xp_earned,
+      created_at: r.created_at,
+    });
+  });
+
+  return activities
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, limit);
 }

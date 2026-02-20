@@ -1,10 +1,11 @@
 import Layout from '@/components/Layout';
 import { motion } from 'framer-motion';
-import { Zap, Flame, Clock, FileText, TrendingUp, BookOpen, Target, ArrowRight } from 'lucide-react';
+import { Zap, Flame, Clock, FileText, TrendingUp, BookOpen, Target, ArrowRight, Timer } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
-import { getProfile, getStudyPlans, getTodaySessions } from '@/lib/database';
+import { getProfile, getStudyPlans, getTodaySessions, getFocusIntegrityScore, getRecentActivity } from '@/lib/database';
+import FocusGauge from '@/components/FocusGauge';
 
 const fadeUp = {
   initial: { opacity: 0, y: 20 },
@@ -39,6 +40,18 @@ export default function Dashboard() {
     enabled: !!user,
   });
 
+  const { data: focusScore } = useQuery({
+    queryKey: ['focus-integrity', user?.id],
+    queryFn: () => user ? getFocusIntegrityScore(user.id) : null,
+    enabled: !!user,
+  });
+
+  const { data: recentActivity } = useQuery({
+    queryKey: ['recent-activity', user?.id],
+    queryFn: () => user ? getRecentActivity(user.id) : [],
+    enabled: !!user,
+  });
+
   const displayName = profile?.name || user?.email?.split('@')[0] || 'Learner';
   const xp = profile?.xp || 0;
   const streak = profile?.streak || 0;
@@ -49,7 +62,7 @@ export default function Dashboard() {
 
   // Get today's plan
   const dayOfWeek = new Date().getDay();
-  const adjustedDay = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Convert to Mon-Sun (0-6)
+  const adjustedDay = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
   const todayPlan = studyPlans?.find(p => p.day_of_week === adjustedDay);
   const blocks = (todayPlan?.blocks as any[]) || [];
   const completedBlocks = blocks.filter((b: any) => b.completed).length;
@@ -145,8 +158,24 @@ export default function Dashboard() {
             )}
           </motion.div>
 
-          {/* Quick Actions */}
+          {/* Right column: Focus Gauge + Quick Actions */}
           <motion.div {...fadeUp} transition={{ duration: 0.5, delay: 0.5 }} className="space-y-4">
+            {/* Focus Integrity Score */}
+            <div className="glass-card rounded-xl p-6">
+              <h2 className="mb-3 font-display text-lg font-semibold text-foreground">Focus Score</h2>
+              <FocusGauge
+                score={focusScore?.score || 0}
+                size={140}
+                breakdown={focusScore ? {
+                  consistency: focusScore.consistency,
+                  completion: focusScore.completion,
+                  interruption: focusScore.interruption,
+                  proofQuality: focusScore.proofQuality,
+                } : undefined}
+              />
+            </div>
+
+            {/* Quick Actions */}
             <div className="glass-card rounded-xl p-6">
               <h2 className="mb-4 font-display text-lg font-semibold text-foreground">Quick Actions</h2>
               <div className="space-y-3">
@@ -162,6 +191,7 @@ export default function Dashboard() {
               </div>
             </div>
 
+            {/* Level Progress */}
             <div className="glass-card rounded-xl p-6">
               <h2 className="mb-3 font-display text-lg font-semibold text-foreground">Level Progress</h2>
               <div className="flex items-center gap-3">
@@ -184,6 +214,39 @@ export default function Dashboard() {
             </div>
           </motion.div>
         </div>
+
+        {/* Recent Activity Feed */}
+        {recentActivity && recentActivity.length > 0 && (
+          <motion.div {...fadeUp} transition={{ duration: 0.5, delay: 0.6 }} className="glass-card rounded-xl p-6">
+            <h2 className="mb-4 font-display text-lg font-semibold text-foreground">Recent Activity</h2>
+            <div className="space-y-2">
+              {recentActivity.map((activity) => (
+                <div key={activity.id} className="flex items-center justify-between rounded-lg border border-border bg-muted/20 px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <div className={`flex h-8 w-8 items-center justify-center rounded-md ${
+                      activity.type === 'session' ? 'bg-primary/10' : 'bg-xp/10'
+                    }`}>
+                      {activity.type === 'session' ? (
+                        <Timer className="h-4 w-4 text-primary" />
+                      ) : (
+                        <FileText className="h-4 w-4 text-xp" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-foreground">{activity.title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {activity.meta || activity.type === 'report' ? 'Daily Report' : ''}
+                        {' • '}
+                        {new Date(activity.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-sm font-medium text-xp">+{activity.xp} XP</span>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
       </div>
     </Layout>
   );
