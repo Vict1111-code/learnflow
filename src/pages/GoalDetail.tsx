@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import Layout from '@/components/Layout';
 import SkillTree, { ConceptNode } from '@/components/SkillTree';
 import ResourceList, { Resource } from '@/components/ResourceList';
+import AISuggestedResources from '@/components/AISuggestedResources';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft, BookOpen, Calendar, Clock, CheckCircle, Circle, Sparkles,
@@ -359,6 +360,13 @@ export default function GoalDetail() {
 
         {/* Resources */}
         <ResourceList resources={resources} conceptNames={conceptNames} />
+
+        {/* AI Suggested Resources */}
+        <AISuggestedResources
+          goalDescription={goal.description}
+          masteryLevel={goal.mastery_level}
+          concepts={concepts.map(c => ({ id: c.id, name: c.name, status: c.status }))}
+        />
 
         {/* Legend */}
         <div className="flex flex-wrap gap-2">

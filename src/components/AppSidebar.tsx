@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, Timer, FileText, Users, Trophy, 
-  User, BookOpen, Zap, Flame, LogOut
+  User, BookOpen, Zap, Flame, LogOut, BarChart3
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
@@ -13,6 +13,7 @@ const navItems = [
   { to: '/study', icon: Timer, label: 'Study Timer' },
   { to: '/plan', icon: BookOpen, label: 'Study Plan' },
   { to: '/report', icon: FileText, label: 'Daily Report' },
+  { to: '/analytics', icon: BarChart3, label: 'Analytics' },
   { to: '/community', icon: Users, label: 'Community' },
   { to: '/leaderboard', icon: Trophy, label: 'Leaderboard' },
   { to: '/profile', icon: User, label: 'Profile' },
