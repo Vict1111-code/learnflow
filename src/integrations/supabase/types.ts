@@ -173,6 +173,60 @@ export type Database = {
         }
         Relationships: []
       }
+      mentor_links: {
+        Row: {
+          created_at: string
+          id: string
+          mentee_id: string
+          mentor_id: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          mentee_id: string
+          mentor_id: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          mentee_id?: string
+          mentor_id?: string
+          status?: string
+        }
+        Relationships: []
+      }
+      portfolio_entries: {
+        Row: {
+          content: string | null
+          created_at: string
+          entry_type: string
+          id: string
+          metadata: Json | null
+          title: string
+          user_id: string
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string
+          entry_type: string
+          id?: string
+          metadata?: Json | null
+          title: string
+          user_id: string
+        }
+        Update: {
+          content?: string | null
+          created_at?: string
+          entry_type?: string
+          id?: string
+          metadata?: Json | null
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       post_comments: {
         Row: {
           content: string
@@ -240,6 +294,7 @@ export type Database = {
           created_at: string
           focus: string | null
           id: string
+          is_public: boolean
           last_active_date: string | null
           level: string
           name: string
@@ -253,6 +308,7 @@ export type Database = {
           created_at?: string
           focus?: string | null
           id?: string
+          is_public?: boolean
           last_active_date?: string | null
           level?: string
           name: string
@@ -266,6 +322,7 @@ export type Database = {
           created_at?: string
           focus?: string | null
           id?: string
+          is_public?: boolean
           last_active_date?: string | null
           level?: string
           name?: string
