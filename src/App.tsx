@@ -16,6 +16,8 @@ import Profile from "./pages/Profile";
 import Onboarding from "./pages/Onboarding";
 import GoalDetail from "./pages/GoalDetail";
 import Analytics from "./pages/Analytics";
+import Portfolio from "./pages/Portfolio";
+import MentorDashboard from "./pages/MentorDashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -77,6 +79,16 @@ const App = () => (
             <Route path="/analytics" element={
               <ProtectedRoute>
                 <Analytics />
+              </ProtectedRoute>
+            } />
+            <Route path="/portfolio" element={
+              <ProtectedRoute>
+                <Portfolio />
+              </ProtectedRoute>
+            } />
+            <Route path="/mentor" element={
+              <ProtectedRoute>
+                <MentorDashboard />
               </ProtectedRoute>
             } />
             <Route path="*" element={<NotFound />} />
