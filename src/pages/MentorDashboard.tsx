@@ -100,13 +100,8 @@ export default function MentorDashboard() {
   const requestMentor = useMutation({
     mutationFn: async (mentorName: string) => {
       if (!user) throw new Error('Not logged in');
-      const { data: mentorProfile } = await supabase
-        .from('profiles')
-        .select('user_id, name')
-        .ilike('name', `%${mentorName}%`)
-        .neq('user_id', user.id)
-        .limit(1)
-        .maybeSingle();
+      const { data: matches } = await supabase.rpc('search_mentor_candidates', { query: mentorName });
+      const mentorProfile = matches?.[0];
 
       if (!mentorProfile) throw new Error('User not found');
 
