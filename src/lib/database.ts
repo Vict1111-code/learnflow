@@ -362,30 +362,19 @@ export async function toggleUpvote(postId: string, userId: string) {
     .eq('post_id', postId)
     .eq('user_id', userId)
     .maybeSingle();
-  
+
   if (existing) {
+    // Counter is auto-decremented by DB trigger
     await supabase.from('post_upvotes').delete().eq('id', existing.id);
-    const { data: post } = await supabase.from('community_posts').select('upvotes').eq('id', postId).single();
-    if (post) {
-      await supabase.from('community_posts').update({ upvotes: Math.max(0, post.upvotes - 1) }).eq('id', postId);
-    }
   } else {
+    // Counter is auto-incremented by DB trigger; UNIQUE constraint prevents duplicates
     await supabase.from('post_upvotes').insert({ post_id: postId, user_id: userId });
-    const { data: post } = await supabase.from('community_posts').select('upvotes').eq('id', postId).single();
-    if (post) {
-      await supabase.from('community_posts').update({ upvotes: post.upvotes + 1 }).eq('id', postId);
-    }
   }
 }
 
 // Leaderboard functions
 export async function getLeaderboard() {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .order('xp', { ascending: false })
-    .limit(10);
-  
+  const { data, error } = await supabase.rpc('get_leaderboard');
   if (error) throw error;
   return data || [];
 }
