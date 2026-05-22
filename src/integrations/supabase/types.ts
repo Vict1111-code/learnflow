@@ -448,6 +448,7 @@ export type Database = {
           level: string
           name: string
           streak: number
+          user_id: string
           xp: number
         }[]
       }
