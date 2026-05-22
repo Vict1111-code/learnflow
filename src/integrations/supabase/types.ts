@@ -440,6 +440,7 @@ export type Database = {
         Returns: undefined
       }
       calculate_focus_integrity: { Args: { p_user_id: string }; Returns: Json }
+      can_view_profile: { Args: { _profile_user_id: string }; Returns: boolean }
       get_leaderboard: {
         Args: never
         Returns: {
@@ -448,6 +449,13 @@ export type Database = {
           name: string
           streak: number
           xp: number
+        }[]
+      }
+      search_mentor_candidates: {
+        Args: { query: string }
+        Returns: {
+          name: string
+          user_id: string
         }[]
       }
     }
