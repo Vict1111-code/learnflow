@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  Treemap, BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell,
+  Treemap, BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell, ComposedChart,
 } from 'recharts';
 
 const RANGE_OPTIONS = [
