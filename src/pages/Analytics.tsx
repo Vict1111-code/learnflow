@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  Treemap, BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell,
+  Treemap, BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell, ComposedChart,
 } from 'recharts';
 
 const RANGE_OPTIONS = [
@@ -314,7 +314,7 @@ export default function Analytics() {
           </div>
           {cumulativeXP.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={cumulativeXP}>
+              <ComposedChart data={cumulativeXP}>
                 <defs>
                   <linearGradient id="gradXP" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="hsl(150 75% 48%)" stopOpacity={0.3} />
@@ -329,7 +329,7 @@ export default function Analytics() {
                 <Area yAxisId="cum" type="monotone" dataKey="cumulative" stroke="hsl(150 75% 48%)" fill="url(#gradXP)" strokeWidth={2} name="Cumulative XP" />
                 <Line yAxisId="daily" type="monotone" dataKey="sessionXP" stroke="hsl(230 80% 62%)" strokeWidth={1.5} dot={false} name="Session XP" />
                 <Line yAxisId="daily" type="monotone" dataKey="reportXP" stroke="hsl(38 95% 55%)" strokeWidth={1.5} dot={false} name="Report XP" />
-              </AreaChart>
+              </ComposedChart>
             </ResponsiveContainer>
           ) : (
             <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
