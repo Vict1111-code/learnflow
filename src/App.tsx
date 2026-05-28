@@ -41,6 +41,7 @@ const protectedRoutes: Array<{ path: string; element: JSX.Element }> = [
   { path: "/analytics", element: <Analytics /> },
   { path: "/portfolio", element: <Portfolio /> },
   { path: "/mentor", element: <MentorDashboard /> },
+  { path: "/memory", element: <Memory /> },
 ];
 
 const App = () => (
