@@ -224,20 +224,23 @@ export default function Analytics() {
   const TreemapContent = (props: any) => {
     const { x, y, width, height, name, count } = props;
     if (width < 40 || height < 25) return null;
+    const label = typeof name === 'string' ? name : '';
+    const safeCount = typeof count === 'number' ? count : 0;
+    const maxChars = Math.floor(width / 7);
     return (
       <g>
         <rect x={x} y={y} width={width} height={height} rx={4}
-          fill={`hsl(0 ${Math.min(80, count * 20)}% ${60 - count * 5}%)`}
+          fill={`hsl(0 ${Math.min(80, safeCount * 20)}% ${60 - safeCount * 5}%)`}
           stroke="hsl(var(--border))" strokeWidth={1} />
-        {width > 60 && height > 35 && (
+        {width > 60 && height > 35 && label && (
           <>
             <text x={x + width / 2} y={y + height / 2 - 6} textAnchor="middle"
               fill="hsl(var(--foreground))" fontSize={11} fontWeight={600}>
-              {name.length > Math.floor(width / 7) ? name.substring(0, Math.floor(width / 7)) + '…' : name}
+              {label.length > maxChars ? label.substring(0, maxChars) + '…' : label}
             </text>
             <text x={x + width / 2} y={y + height / 2 + 10} textAnchor="middle"
               fill="hsl(var(--muted-foreground))" fontSize={10}>
-              ×{count}
+              ×{safeCount}
             </text>
           </>
         )}
