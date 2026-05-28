@@ -567,6 +567,73 @@ export default function StudyTimer() {
           </motion.div>
         )}
       </div>
+
+      {/* Fullscreen Focus Mode overlay */}
+      <AnimatePresence>
+        {fullscreen && state !== 'idle' && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-background/95 backdrop-blur-2xl"
+          >
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,hsl(var(--primary)/0.15),transparent_60%)]" />
+            <div className="relative z-10 flex flex-col items-center gap-8">
+              <p className="text-sm uppercase tracking-[0.3em] text-muted-foreground">
+                {topic || 'Deep work'}
+              </p>
+              <p className={`font-display text-7xl font-bold tracking-tight md:text-9xl ${state === 'running' ? 'text-gradient-primary' : 'text-foreground'}`}>
+                {formatTime(seconds)}
+              </p>
+              <AnimatePresence mode="wait">
+                <motion.p
+                  key={motivationIdx}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  className="max-w-md text-center text-base italic text-primary/80"
+                >
+                  {MOTIVATIONS[motivationIdx]}
+                </motion.p>
+              </AnimatePresence>
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                {state === 'running' ? (
+                  <Button onClick={handlePause} variant="outline" size="lg">
+                    <Pause className="mr-2 h-4 w-4" /> Pause
+                  </Button>
+                ) : (
+                  <Button onClick={handleStart} className="bg-gradient-primary text-primary-foreground hover:opacity-90" size="lg">
+                    <Play className="mr-2 h-4 w-4" /> Resume
+                  </Button>
+                )}
+                <Button onClick={() => setInterruptions(i => i + 1)} variant="outline" size="lg" className="text-streak">
+                  <AlertTriangle className="mr-2 h-4 w-4" /> Interruption ({interruptions})
+                </Button>
+                <Button onClick={handleStop} variant="destructive" size="lg">
+                  <Square className="mr-2 h-4 w-4" /> End
+                </Button>
+                <Button onClick={() => setFullscreen(false)} variant="ghost" size="lg">
+                  <Minimize2 className="mr-2 h-4 w-4" /> Exit
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <ReflectionModal
+        open={!!reflection}
+        onOpenChange={(o) => { if (!o) setReflection(null); }}
+        sessionId={reflection?.sessionId ?? null}
+        userId={user?.id ?? null}
+        initialTags={reflection?.tags ?? []}
+        durationSeconds={reflection?.duration ?? 0}
+        topic={reflection?.topic ?? ''}
+        onSaved={() => {
+          queryClient.invalidateQueries({ queryKey: ['session-history'] });
+          queryClient.invalidateQueries({ queryKey: ['learning-memory'] });
+        }}
+      />
     </Layout>
   );
 }
