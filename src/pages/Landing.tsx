@@ -96,7 +96,7 @@ export default function Landing() {
             ))}
           </nav>
           <div className="flex items-center gap-3">
-            <Link to="/auth" className="hidden text-sm text-muted-foreground hover:text-foreground sm:inline">Sign in</Link>
+            <Link to={signInHref} className="hidden text-sm text-muted-foreground hover:text-foreground sm:inline">Sign in</Link>
             <Button asChild size="sm" className="bg-gradient-primary shadow-glow-primary">
               <Link to={ctaHref}>Get Started</Link>
             </Button>
@@ -556,7 +556,7 @@ export default function Landing() {
           <div className="flex gap-6">
             <a href="#features" className="hover:text-foreground">Features</a>
             <a href="#pricing" className="hover:text-foreground">Pricing</a>
-            <Link to="/auth" className="hover:text-foreground">Sign in</Link>
+            <Link to={signInHref} className="hover:text-foreground">Sign in</Link>
           </div>
         </div>
       </footer>
