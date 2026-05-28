@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Play, Pause, Square, RotateCcw, Zap, AlertTriangle, Clock, History, Maximize2, Minimize2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { startStudySession, endStudySession, getTodaySessions, getLearningGoals, getSessionHistory, type LearningGoal } from '@/lib/database';
+import { startStudySession, endStudySession, getTodaySessions, getLearningGoals, getSessionHistory, heartbeatStudySession, type LearningGoal } from '@/lib/database';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import ReflectionModal from '@/components/study/ReflectionModal';
