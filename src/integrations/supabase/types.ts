@@ -527,6 +527,20 @@ export type Database = {
           xp: number
         }[]
       }
+      get_visible_profile: {
+        Args: { _profile_user_id: string }
+        Returns: {
+          avatar_url: string
+          focus: string
+          is_public: boolean
+          level: string
+          name: string
+          streak: number
+          user_id: string
+          username: string
+          xp: number
+        }[]
+      }
       search_mentor_candidates: {
         Args: { query: string }
         Returns: {
