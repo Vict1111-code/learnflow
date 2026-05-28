@@ -217,9 +217,13 @@ export default function StudyTimer() {
   const handleStop = async () => {
     const finalSeconds =
       accumulated + (state === 'running' && startedAt ? Math.floor((Date.now() - startedAt) / 1000) : 0);
-    if (currentSessionId && finalSeconds > 0) {
+    const stoppedSessionId = currentSessionId;
+    const stoppedTopic = topic || 'General Study';
+    const stoppedTags = tags.split(',').map(t => t.trim()).filter(Boolean);
+
+    if (stoppedSessionId && finalSeconds > 0) {
       try {
-        await endStudySession(currentSessionId, finalSeconds, interruptions);
+        await endStudySession(stoppedSessionId, finalSeconds, interruptions);
         const xpEarned = Math.min(Math.floor(finalSeconds / 60), 60);
         toast.success(`Session ended! +${xpEarned} XP earned`);
         queryClient.invalidateQueries({ queryKey: ['today-sessions'] });
@@ -229,6 +233,7 @@ export default function StudyTimer() {
         toast.error('Failed to save session');
       }
     }
+
     setState('idle');
     setStartedAt(null);
     setAccumulated(0);
@@ -236,8 +241,16 @@ export default function StudyTimer() {
     setCurrentSessionId(null);
     setInterruptions(0);
     setNotes('');
+    setTags('');
+    setFullscreen(false);
     try { localStorage.removeItem('learnflow:study-timer'); } catch {}
+
+    // Trigger reflection capture for completed work.
+    if (stoppedSessionId && finalSeconds >= 30 && user) {
+      setReflection({ sessionId: stoppedSessionId, duration: finalSeconds, topic: stoppedTopic, tags: stoppedTags });
+    }
   };
+
 
   const handleReset = () => {
     setAccumulated(0);
