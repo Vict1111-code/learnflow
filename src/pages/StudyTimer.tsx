@@ -502,6 +502,19 @@ export default function StudyTimer() {
                 className="w-full rounded-lg border border-border bg-muted/50 px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               />
             </div>
+
+            {/* Tags */}
+            <div>
+              <label className="mb-1.5 block text-sm text-muted-foreground">Tags</label>
+              <input
+                type="text"
+                value={tags}
+                onChange={(e) => setTags(e.target.value)}
+                placeholder="comma, separated (e.g. golang, pointers)"
+                className="w-full rounded-lg border border-border bg-muted/50 px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+              <p className="mt-1 text-[11px] text-muted-foreground">Searchable from your Learning Memory.</p>
+            </div>
           </div>
         </motion.div>
 
