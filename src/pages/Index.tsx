@@ -89,7 +89,7 @@ export default function Dashboard() {
         </motion.div>
 
         {/* Stat Cards */}
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
           {statCards.map((stat, i) => (
             <motion.div
               key={stat.label}
@@ -106,9 +106,9 @@ export default function Dashboard() {
           ))}
         </div>
 
-        <div className="grid grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           {/* Today's Progress */}
-          <motion.div {...fadeUp} transition={{ duration: 0.5, delay: 0.4 }} className="col-span-2 glass-card rounded-xl p-6">
+          <motion.div {...fadeUp} transition={{ duration: 0.5, delay: 0.4 }} className="glass-card rounded-xl p-6 lg:col-span-2">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="font-display text-lg font-semibold text-foreground">Today's Study Plan</h2>
               <Link to="/plan" className="flex items-center gap-1 text-sm text-primary hover:underline">
