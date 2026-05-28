@@ -262,10 +262,38 @@ export default function StudyTimer() {
   return (
     <Layout>
       <div className="mx-auto max-w-2xl space-y-8">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <h1 className="font-display text-3xl font-bold text-foreground">Study Timer</h1>
-          <p className="mt-1 text-muted-foreground">Focus deeply. Track everything. Earn XP.</p>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 className="font-display text-3xl font-bold text-foreground">Study Timer</h1>
+            <p className="mt-1 text-muted-foreground">Focus deeply. Reflect. Build memory.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/memory">Learning Memory</Link>
+            </Button>
+            {state !== 'idle' && (
+              <Button variant="outline" size="sm" onClick={() => setFullscreen(f => !f)} className="gap-1.5">
+                {fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                {fullscreen ? 'Exit Focus' : 'Focus Mode'}
+              </Button>
+            )}
+          </div>
         </motion.div>
+
+        <AnimatePresence>
+          {state === 'running' && (
+            <motion.p
+              key={motivationIdx}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              className="text-center text-sm italic text-primary/80"
+            >
+              {MOTIVATIONS[motivationIdx]}
+            </motion.p>
+          )}
+        </AnimatePresence>
+
 
         {/* Timer Display with Progress Ring */}
         <motion.div
