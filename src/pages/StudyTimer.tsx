@@ -90,6 +90,14 @@ export default function StudyTimer() {
   const [targetDuration, setTargetDuration] = useState(persisted.targetDuration ?? 25 * 60);
   const [customMinutes, setCustomMinutes] = useState(persisted.customMinutes ?? '');
   const [isCustomDuration, setIsCustomDuration] = useState(persisted.isCustomDuration ?? false);
+  const [tags, setTags] = useState<string>(persisted.tags ?? '');
+
+  // Reflection modal state — opens after a session is stopped.
+  const [reflection, setReflection] = useState<{ sessionId: string; duration: number; topic: string; tags: string[] } | null>(null);
+  // Fullscreen focus mode.
+  const [fullscreen, setFullscreen] = useState(false);
+  // Rotating motivational prompt during a session.
+  const [motivationIdx, setMotivationIdx] = useState(0);
 
   useEffect(() => {
     const data: PersistedTimer = {
@@ -97,10 +105,17 @@ export default function StudyTimer() {
       sessionId: currentSessionId,
       block: selectedBlock, topic,
       goalId: selectedGoalId, conceptId: selectedConceptId,
-      notes, interruptions, targetDuration, isCustomDuration, customMinutes,
+      notes, interruptions, targetDuration, isCustomDuration, customMinutes, tags,
     };
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch {}
-  }, [state, startedAt, accumulated, currentSessionId, selectedBlock, topic, selectedGoalId, selectedConceptId, notes, interruptions, targetDuration, isCustomDuration, customMinutes]);
+  }, [state, startedAt, accumulated, currentSessionId, selectedBlock, topic, selectedGoalId, selectedConceptId, notes, interruptions, targetDuration, isCustomDuration, customMinutes, tags]);
+
+  useEffect(() => {
+    if (state !== 'running') return;
+    const id = setInterval(() => setMotivationIdx(i => (i + 1) % MOTIVATIONS.length), 12000);
+    return () => clearInterval(id);
+  }, [state]);
+
 
   // Disable refetchOnWindowFocus so returning to the tab doesn't trigger reloads.
   const { data: goals } = useQuery({
