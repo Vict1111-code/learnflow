@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { getProfile } from '@/lib/database';
 import { cn } from '@/lib/utils';
+import logo from '@/assets/learnflow-logo.png';
 
 export const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -58,9 +59,7 @@ export default function AppSidebar({ variant = 'fixed', onNavigate }: AppSidebar
         onClick={onNavigate}
         className="flex items-center gap-2.5 px-6 py-5 transition-opacity hover:opacity-80"
       >
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-primary">
-          <Zap className="h-5 w-5 text-primary-foreground" />
-        </div>
+        <img src={logo} alt="learnflow" className="h-9 w-9 object-contain" />
         <span className="font-display text-xl font-bold text-foreground">learnflow</span>
       </Link>
 

@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Menu, Zap } from 'lucide-react';
+import { Menu } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useAuth } from '@/contexts/AuthContext';
 import AppSidebar from './AppSidebar';
+import logo from '@/assets/learnflow-logo.png';
 
 export default function MobileTopBar() {
   const [open, setOpen] = useState(false);
@@ -13,9 +14,7 @@ export default function MobileTopBar() {
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border/60 bg-background/80 px-4 backdrop-blur-xl lg:hidden">
       <Link to={logoHref} className="flex items-center gap-2">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-primary">
-          <Zap className="h-4 w-4 text-primary-foreground" />
-        </div>
+        <img src={logo} alt="learnflow" className="h-8 w-8 object-contain" />
         <span className="font-display text-lg font-bold">learnflow</span>
       </Link>
       <Sheet open={open} onOpenChange={setOpen}>
