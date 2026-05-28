@@ -8,6 +8,11 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
+import Login from "./pages/Login";
+import Signup from "./pages/Signup";
+import VerifyEmail from "./pages/VerifyEmail";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import StudyTimer from "./pages/StudyTimer";
 import StudyPlan from "./pages/StudyPlan";
 import DailyReport from "./pages/DailyReport";
@@ -23,6 +28,20 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
+const protectedRoutes: Array<{ path: string; element: JSX.Element }> = [
+  { path: "/dashboard", element: <Index /> },
+  { path: "/study", element: <StudyTimer /> },
+  { path: "/plan", element: <StudyPlan /> },
+  { path: "/report", element: <DailyReport /> },
+  { path: "/community", element: <Community /> },
+  { path: "/leaderboard", element: <Leaderboard /> },
+  { path: "/profile", element: <Profile /> },
+  { path: "/goal/:id", element: <GoalDetail /> },
+  { path: "/analytics", element: <Analytics /> },
+  { path: "/portfolio", element: <Portfolio /> },
+  { path: "/mentor", element: <MentorDashboard /> },
+];
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
@@ -31,68 +50,41 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/onboarding" element={
-              <ProtectedRoute>
-                <Onboarding />
-              </ProtectedRoute>
-            } />
+            {/* Public */}
             <Route path="/" element={<Landing />} />
-            <Route path="/dashboard" element={
-              <ProtectedRoute>
-                <Index />
-              </ProtectedRoute>
-            } />
-            <Route path="/study" element={
-              <ProtectedRoute>
-                <StudyTimer />
-              </ProtectedRoute>
-            } />
-            <Route path="/plan" element={
-              <ProtectedRoute>
-                <StudyPlan />
-              </ProtectedRoute>
-            } />
-            <Route path="/report" element={
-              <ProtectedRoute>
-                <DailyReport />
-              </ProtectedRoute>
-            } />
-            <Route path="/community" element={
-              <ProtectedRoute>
-                <Community />
-              </ProtectedRoute>
-            } />
-            <Route path="/leaderboard" element={
-              <ProtectedRoute>
-                <Leaderboard />
-              </ProtectedRoute>
-            } />
-            <Route path="/profile" element={
-              <ProtectedRoute>
-                <Profile />
-              </ProtectedRoute>
-            } />
-            <Route path="/goal/:id" element={
-              <ProtectedRoute>
-                <GoalDetail />
-              </ProtectedRoute>
-            } />
-            <Route path="/analytics" element={
-              <ProtectedRoute>
-                <Analytics />
-              </ProtectedRoute>
-            } />
-            <Route path="/portfolio" element={
-              <ProtectedRoute>
-                <Portfolio />
-              </ProtectedRoute>
-            } />
-            <Route path="/mentor" element={
-              <ProtectedRoute>
-                <MentorDashboard />
-              </ProtectedRoute>
-            } />
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+
+            {/* Auth-gated but pre-verification / pre-onboarding */}
+            <Route
+              path="/verify-email"
+              element={
+                <ProtectedRoute allowUnverified allowUnonboarded>
+                  <VerifyEmail />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/onboarding"
+              element={
+                <ProtectedRoute allowUnonboarded>
+                  <Onboarding />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Fully-protected app */}
+            {protectedRoutes.map(({ path, element }) => (
+              <Route
+                key={path}
+                path={path}
+                element={<ProtectedRoute>{element}</ProtectedRoute>}
+              />
+            ))}
+
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

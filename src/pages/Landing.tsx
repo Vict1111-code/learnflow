@@ -74,7 +74,8 @@ const pricing = [
 
 export default function Landing() {
   const { user } = useAuth();
-  const ctaHref = user ? '/dashboard' : '/auth';
+  const ctaHref = user ? '/dashboard' : '/signup';
+  const signInHref = user ? '/dashboard' : '/login';
 
   return (
     <div className="min-h-screen overflow-hidden bg-background text-foreground">
