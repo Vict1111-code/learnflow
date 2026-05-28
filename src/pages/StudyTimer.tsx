@@ -154,8 +154,9 @@ export default function StudyTimer() {
 
   const handleStart = async () => {
     if (!user) return;
-    
+
     if (state === 'paused') {
+      setStartedAt(Date.now());
       setState('running');
       return;
     }
@@ -168,19 +169,29 @@ export default function StudyTimer() {
         targetDuration: targetDuration || undefined,
       });
       setCurrentSessionId(session.id);
+      setAccumulated(0);
+      setStartedAt(Date.now());
       setState('running');
     } catch (error) {
       toast.error('Failed to start session');
     }
   };
 
-  const handlePause = () => setState('paused');
+  const handlePause = () => {
+    if (state === 'running' && startedAt) {
+      setAccumulated(a => a + Math.floor((Date.now() - startedAt) / 1000));
+      setStartedAt(null);
+    }
+    setState('paused');
+  };
 
   const handleStop = async () => {
-    if (currentSessionId && seconds > 0) {
+    const finalSeconds =
+      accumulated + (state === 'running' && startedAt ? Math.floor((Date.now() - startedAt) / 1000) : 0);
+    if (currentSessionId && finalSeconds > 0) {
       try {
-        await endStudySession(currentSessionId, seconds, interruptions);
-        const xpEarned = Math.min(Math.floor(seconds / 60), 60);
+        await endStudySession(currentSessionId, finalSeconds, interruptions);
+        const xpEarned = Math.min(Math.floor(finalSeconds / 60), 60);
         toast.success(`Session ended! +${xpEarned} XP earned`);
         queryClient.invalidateQueries({ queryKey: ['today-sessions'] });
         queryClient.invalidateQueries({ queryKey: ['session-history'] });
@@ -190,13 +201,21 @@ export default function StudyTimer() {
       }
     }
     setState('idle');
+    setStartedAt(null);
+    setAccumulated(0);
     setSeconds(0);
     setCurrentSessionId(null);
     setInterruptions(0);
     setNotes('');
+    try { localStorage.removeItem('learnflow:study-timer'); } catch {}
   };
 
-  const handleReset = () => setSeconds(0);
+  const handleReset = () => {
+    setAccumulated(0);
+    setStartedAt(state === 'running' ? Date.now() : null);
+    setSeconds(0);
+  };
+
 
   return (
     <Layout>
