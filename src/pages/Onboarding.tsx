@@ -63,7 +63,7 @@ const createEmptyPlan = (): LearningPlan => ({
 
 export default function Onboarding() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, refreshProfile } = useAuth();
   const [step, setStep] = useState(0);
   const [plans, setPlans] = useState<LearningPlan[]>([createEmptyPlan()]);
   const [currentPlanIndex, setCurrentPlanIndex] = useState(0);
@@ -147,11 +147,16 @@ export default function Onboarding() {
         }
       }
 
-      // Update profile focus with first plan's description
+      // Update profile focus with first plan's description and mark onboarding complete
       await updateProfile(user.id, { focus: plans[0].description.slice(0, 100) });
+      await supabase
+        .from('profiles')
+        .update({ onboarding_completed: true, email_verified: true })
+        .eq('user_id', user.id);
+      await refreshProfile();
 
       toast.success(`${plans.length} study plan${plans.length > 1 ? 's' : ''} generated successfully!`);
-      navigate('/');
+      navigate('/dashboard', { replace: true });
     } catch (error) {
       console.error('Onboarding error:', error);
       toast.error('Something went wrong. Please try again.');
@@ -159,6 +164,7 @@ export default function Onboarding() {
       setGenerating(false);
     }
   };
+
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
