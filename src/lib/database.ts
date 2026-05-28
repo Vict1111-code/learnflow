@@ -249,6 +249,18 @@ export async function startStudySession(
   return data;
 }
 
+export async function heartbeatStudySession(sessionId: string, durationSeconds: number, interruptions?: number) {
+  const updateData: any = { duration_seconds: durationSeconds };
+  if (interruptions !== undefined) updateData.interruptions = interruptions;
+  const { error } = await supabase
+    .from('study_sessions')
+    .update(updateData)
+    .eq('id', sessionId)
+    .is('ended_at', null);
+  if (error) throw error;
+}
+
+
 export async function endStudySession(sessionId: string, durationSeconds: number, interruptions?: number) {
   const updateData: any = {
     ended_at: new Date().toISOString(),

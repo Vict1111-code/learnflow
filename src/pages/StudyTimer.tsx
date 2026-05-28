@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Play, Pause, Square, RotateCcw, Zap, AlertTriangle, Clock, History, Maximize2, Minimize2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { startStudySession, endStudySession, getTodaySessions, getLearningGoals, getSessionHistory, type LearningGoal } from '@/lib/database';
+import { startStudySession, endStudySession, getTodaySessions, getLearningGoals, getSessionHistory, heartbeatStudySession, type LearningGoal } from '@/lib/database';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import ReflectionModal from '@/components/study/ReflectionModal';
@@ -171,6 +171,39 @@ export default function StudyTimer() {
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
   }, [state]);
+
+  // Backend heartbeat — periodically sync active session duration so the session
+  // can't be lost on backgrounding, throttled tabs, network blips, or accidental closes.
+  useEffect(() => {
+    if (state !== 'running' || !currentSessionId) return;
+
+    const sync = () => {
+      const elapsed =
+        accumulated + (startedAt ? Math.floor((Date.now() - startedAt) / 1000) : 0);
+      if (elapsed <= 0) return;
+      heartbeatStudySession(currentSessionId, elapsed, interruptions).catch(() => {
+        // Swallow errors — heartbeat is best-effort; next tick will retry.
+      });
+    };
+
+    sync();
+    const interval = setInterval(sync, 20000);
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') sync();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('focus', sync);
+    window.addEventListener('pagehide', sync);
+
+    return () => {
+      clearInterval(interval);
+      sync();
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('focus', sync);
+      window.removeEventListener('pagehide', sync);
+    };
+  }, [state, currentSessionId, startedAt, accumulated, interruptions]);
+
 
   const formatTime = useCallback((s: number) => {
     const h = Math.floor(s / 3600);
