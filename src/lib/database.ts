@@ -457,3 +457,147 @@ export async function getRecentActivity(userId: string, limit = 5) {
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .slice(0, limit);
 }
+
+// =================== Session Reflections & Learning Memory ===================
+
+export interface SessionReflection {
+  id: string;
+  session_id: string;
+  user_id: string;
+  learned: string | null;
+  challenged: string | null;
+  revise: string | null;
+  focus_rating: number | null;
+  distractions: string | null;
+  mood: string | null;
+  tags: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export async function upsertSessionReflection(
+  reflection: Omit<SessionReflection, 'id' | 'created_at' | 'updated_at'>
+) {
+  const { data, error } = await supabase
+    .from('session_reflections')
+    .upsert(reflection as any, { onConflict: 'session_id' })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function getReflectionForSession(sessionId: string) {
+  const { data, error } = await supabase
+    .from('session_reflections')
+    .select('*')
+    .eq('session_id', sessionId)
+    .maybeSingle();
+  if (error) throw error;
+  return data as SessionReflection | null;
+}
+
+export async function updateSessionTags(sessionId: string, tags: string[]) {
+  const { error } = await supabase
+    .from('study_sessions')
+    .update({ tags } as any)
+    .eq('id', sessionId);
+  if (error) throw error;
+}
+
+export interface MemoryEntry {
+  session: any;
+  reflection: SessionReflection | null;
+}
+
+export async function searchLearningMemory(
+  userId: string,
+  opts: { query?: string; tag?: string; limit?: number } = {}
+): Promise<MemoryEntry[]> {
+  const { query, tag, limit = 100 } = opts;
+  let sessionQuery = supabase
+    .from('study_sessions')
+    .select('*')
+    .eq('user_id', userId)
+    .not('ended_at', 'is', null)
+    .order('started_at', { ascending: false })
+    .limit(limit);
+
+  if (tag) sessionQuery = sessionQuery.contains('tags', [tag] as any);
+  if (query && query.trim()) {
+    const q = `%${query.trim()}%`;
+    sessionQuery = sessionQuery.or(`topic.ilike.${q},notes.ilike.${q}`);
+  }
+
+  const { data: sessions, error: sErr } = await sessionQuery;
+  if (sErr) throw sErr;
+
+  const sessionIds = (sessions || []).map((s: any) => s.id);
+  let reflections: SessionReflection[] = [];
+  if (sessionIds.length > 0) {
+    const { data: refs, error: rErr } = await supabase
+      .from('session_reflections')
+      .select('*')
+      .in('session_id', sessionIds);
+    if (rErr) throw rErr;
+    reflections = (refs || []) as SessionReflection[];
+  }
+
+  // If a free-text query is set, also include sessions whose reflections match it.
+  if (query && query.trim()) {
+    const q = `%${query.trim()}%`;
+    const { data: refMatches } = await supabase
+      .from('session_reflections')
+      .select('*')
+      .eq('user_id', userId)
+      .or(`learned.ilike.${q},challenged.ilike.${q},revise.ilike.${q}`)
+      .limit(limit);
+
+    const extraIds = (refMatches || [])
+      .map(r => r.session_id)
+      .filter(id => !sessionIds.includes(id));
+    if (extraIds.length > 0) {
+      const { data: extraSessions } = await supabase
+        .from('study_sessions')
+        .select('*')
+        .in('id', extraIds);
+      (extraSessions || []).forEach(s => (sessions as any[]).push(s));
+      reflections = reflections.concat((refMatches || []) as SessionReflection[]);
+    }
+  }
+
+  const refBySession = new Map(reflections.map(r => [r.session_id, r]));
+  return ((sessions as any[]) || [])
+    .sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime())
+    .map(s => ({ session: s, reflection: refBySession.get(s.id) ?? null }));
+}
+
+export async function getAllUserTags(userId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('study_sessions')
+    .select('tags')
+    .eq('user_id', userId)
+    .not('ended_at', 'is', null);
+  if (error) throw error;
+  const set = new Set<string>();
+  (data || []).forEach((r: any) => (r.tags || []).forEach((t: string) => t && set.add(t)));
+  return Array.from(set).sort();
+}
+
+export async function getActivityHeatmap(userId: string, days = 365) {
+  const since = new Date();
+  since.setDate(since.getDate() - days);
+  const { data, error } = await supabase
+    .from('study_sessions')
+    .select('started_at, duration_seconds')
+    .eq('user_id', userId)
+    .not('ended_at', 'is', null)
+    .gte('started_at', since.toISOString());
+  if (error) throw error;
+  const map = new Map<string, number>();
+  (data || []).forEach((s: any) => {
+    const day = s.started_at.slice(0, 10);
+    map.set(day, (map.get(day) || 0) + (s.duration_seconds || 0));
+  });
+  return map; // dateString -> total seconds
+}
