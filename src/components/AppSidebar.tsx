@@ -1,7 +1,7 @@
 import { NavLink, useLocation, Link } from 'react-router-dom';
 import {
   LayoutDashboard, Timer, FileText, Users, Trophy,
-  User, BookOpen, Zap, Flame, LogOut, BarChart3, Award, GraduationCap
+  User, BookOpen, Zap, Flame, LogOut, BarChart3, Award, GraduationCap, Brain
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
