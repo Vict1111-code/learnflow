@@ -56,6 +56,7 @@ export default function StudyTimer() {
     targetDuration: number;
     isCustomDuration: boolean;
     customMinutes: string;
+    tags: string;
   };
   const loadPersisted = (): Partial<PersistedTimer> => {
     try {
@@ -66,6 +67,8 @@ export default function StudyTimer() {
     }
   };
   const persisted = loadPersisted();
+
+
 
   const [state, setState] = useState<TimerState>(persisted.state ?? 'idle');
   const [startedAt, setStartedAt] = useState<number | null>(persisted.startedAt ?? null);
