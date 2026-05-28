@@ -1,14 +1,25 @@
 import { useState, useEffect, useCallback } from 'react';
 import Layout from '@/components/Layout';
-import { motion } from 'framer-motion';
-import { Play, Pause, Square, RotateCcw, Zap, AlertTriangle, Clock, History } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Play, Pause, Square, RotateCcw, Zap, AlertTriangle, Clock, History, Maximize2, Minimize2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { startStudySession, endStudySession, getTodaySessions, getLearningGoals, getSessionHistory, type LearningGoal } from '@/lib/database';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import ReflectionModal from '@/components/study/ReflectionModal';
+import { Link } from 'react-router-dom';
 
 type TimerState = 'idle' | 'running' | 'paused';
+
+const MOTIVATIONS = [
+  'Deep work beats long work.',
+  'You are building memory, not just minutes.',
+  'Small reps. Big compounding.',
+  'Focus is a skill. You are training it now.',
+  'One concept truly understood > ten skimmed.',
+  'Breathe. Stay with the problem.',
+];
 
 const BLOCK_LABELS: Record<string, string> = {
   input: 'Input',
@@ -45,6 +56,7 @@ export default function StudyTimer() {
     targetDuration: number;
     isCustomDuration: boolean;
     customMinutes: string;
+    tags: string;
   };
   const loadPersisted = (): Partial<PersistedTimer> => {
     try {
@@ -55,6 +67,8 @@ export default function StudyTimer() {
     }
   };
   const persisted = loadPersisted();
+
+
 
   const [state, setState] = useState<TimerState>(persisted.state ?? 'idle');
   const [startedAt, setStartedAt] = useState<number | null>(persisted.startedAt ?? null);
@@ -76,6 +90,14 @@ export default function StudyTimer() {
   const [targetDuration, setTargetDuration] = useState(persisted.targetDuration ?? 25 * 60);
   const [customMinutes, setCustomMinutes] = useState(persisted.customMinutes ?? '');
   const [isCustomDuration, setIsCustomDuration] = useState(persisted.isCustomDuration ?? false);
+  const [tags, setTags] = useState<string>(persisted.tags ?? '');
+
+  // Reflection modal state — opens after a session is stopped.
+  const [reflection, setReflection] = useState<{ sessionId: string; duration: number; topic: string; tags: string[] } | null>(null);
+  // Fullscreen focus mode.
+  const [fullscreen, setFullscreen] = useState(false);
+  // Rotating motivational prompt during a session.
+  const [motivationIdx, setMotivationIdx] = useState(0);
 
   useEffect(() => {
     const data: PersistedTimer = {
@@ -83,10 +105,17 @@ export default function StudyTimer() {
       sessionId: currentSessionId,
       block: selectedBlock, topic,
       goalId: selectedGoalId, conceptId: selectedConceptId,
-      notes, interruptions, targetDuration, isCustomDuration, customMinutes,
+      notes, interruptions, targetDuration, isCustomDuration, customMinutes, tags,
     };
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch {}
-  }, [state, startedAt, accumulated, currentSessionId, selectedBlock, topic, selectedGoalId, selectedConceptId, notes, interruptions, targetDuration, isCustomDuration, customMinutes]);
+  }, [state, startedAt, accumulated, currentSessionId, selectedBlock, topic, selectedGoalId, selectedConceptId, notes, interruptions, targetDuration, isCustomDuration, customMinutes, tags]);
+
+  useEffect(() => {
+    if (state !== 'running') return;
+    const id = setInterval(() => setMotivationIdx(i => (i + 1) % MOTIVATIONS.length), 12000);
+    return () => clearInterval(id);
+  }, [state]);
+
 
   // Disable refetchOnWindowFocus so returning to the tab doesn't trigger reloads.
   const { data: goals } = useQuery({
@@ -188,9 +217,13 @@ export default function StudyTimer() {
   const handleStop = async () => {
     const finalSeconds =
       accumulated + (state === 'running' && startedAt ? Math.floor((Date.now() - startedAt) / 1000) : 0);
-    if (currentSessionId && finalSeconds > 0) {
+    const stoppedSessionId = currentSessionId;
+    const stoppedTopic = topic || 'General Study';
+    const stoppedTags = tags.split(',').map(t => t.trim()).filter(Boolean);
+
+    if (stoppedSessionId && finalSeconds > 0) {
       try {
-        await endStudySession(currentSessionId, finalSeconds, interruptions);
+        await endStudySession(stoppedSessionId, finalSeconds, interruptions);
         const xpEarned = Math.min(Math.floor(finalSeconds / 60), 60);
         toast.success(`Session ended! +${xpEarned} XP earned`);
         queryClient.invalidateQueries({ queryKey: ['today-sessions'] });
@@ -200,6 +233,7 @@ export default function StudyTimer() {
         toast.error('Failed to save session');
       }
     }
+
     setState('idle');
     setStartedAt(null);
     setAccumulated(0);
@@ -207,8 +241,16 @@ export default function StudyTimer() {
     setCurrentSessionId(null);
     setInterruptions(0);
     setNotes('');
+    setTags('');
+    setFullscreen(false);
     try { localStorage.removeItem('learnflow:study-timer'); } catch {}
+
+    // Trigger reflection capture for completed work.
+    if (stoppedSessionId && finalSeconds >= 30 && user) {
+      setReflection({ sessionId: stoppedSessionId, duration: finalSeconds, topic: stoppedTopic, tags: stoppedTags });
+    }
   };
+
 
   const handleReset = () => {
     setAccumulated(0);
@@ -220,10 +262,38 @@ export default function StudyTimer() {
   return (
     <Layout>
       <div className="mx-auto max-w-2xl space-y-8">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <h1 className="font-display text-3xl font-bold text-foreground">Study Timer</h1>
-          <p className="mt-1 text-muted-foreground">Focus deeply. Track everything. Earn XP.</p>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 className="font-display text-3xl font-bold text-foreground">Study Timer</h1>
+            <p className="mt-1 text-muted-foreground">Focus deeply. Reflect. Build memory.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/memory">Learning Memory</Link>
+            </Button>
+            {state !== 'idle' && (
+              <Button variant="outline" size="sm" onClick={() => setFullscreen(f => !f)} className="gap-1.5">
+                {fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                {fullscreen ? 'Exit Focus' : 'Focus Mode'}
+              </Button>
+            )}
+          </div>
         </motion.div>
+
+        <AnimatePresence>
+          {state === 'running' && (
+            <motion.p
+              key={motivationIdx}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              className="text-center text-sm italic text-primary/80"
+            >
+              {MOTIVATIONS[motivationIdx]}
+            </motion.p>
+          )}
+        </AnimatePresence>
+
 
         {/* Timer Display with Progress Ring */}
         <motion.div
@@ -432,6 +502,19 @@ export default function StudyTimer() {
                 className="w-full rounded-lg border border-border bg-muted/50 px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               />
             </div>
+
+            {/* Tags */}
+            <div>
+              <label className="mb-1.5 block text-sm text-muted-foreground">Tags</label>
+              <input
+                type="text"
+                value={tags}
+                onChange={(e) => setTags(e.target.value)}
+                placeholder="comma, separated (e.g. golang, pointers)"
+                className="w-full rounded-lg border border-border bg-muted/50 px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+              <p className="mt-1 text-[11px] text-muted-foreground">Searchable from your Learning Memory.</p>
+            </div>
           </div>
         </motion.div>
 
@@ -484,6 +567,73 @@ export default function StudyTimer() {
           </motion.div>
         )}
       </div>
+
+      {/* Fullscreen Focus Mode overlay */}
+      <AnimatePresence>
+        {fullscreen && state !== 'idle' && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-background/95 backdrop-blur-2xl"
+          >
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,hsl(var(--primary)/0.15),transparent_60%)]" />
+            <div className="relative z-10 flex flex-col items-center gap-8">
+              <p className="text-sm uppercase tracking-[0.3em] text-muted-foreground">
+                {topic || 'Deep work'}
+              </p>
+              <p className={`font-display text-7xl font-bold tracking-tight md:text-9xl ${state === 'running' ? 'text-gradient-primary' : 'text-foreground'}`}>
+                {formatTime(seconds)}
+              </p>
+              <AnimatePresence mode="wait">
+                <motion.p
+                  key={motivationIdx}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  className="max-w-md text-center text-base italic text-primary/80"
+                >
+                  {MOTIVATIONS[motivationIdx]}
+                </motion.p>
+              </AnimatePresence>
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                {state === 'running' ? (
+                  <Button onClick={handlePause} variant="outline" size="lg">
+                    <Pause className="mr-2 h-4 w-4" /> Pause
+                  </Button>
+                ) : (
+                  <Button onClick={handleStart} className="bg-gradient-primary text-primary-foreground hover:opacity-90" size="lg">
+                    <Play className="mr-2 h-4 w-4" /> Resume
+                  </Button>
+                )}
+                <Button onClick={() => setInterruptions(i => i + 1)} variant="outline" size="lg" className="text-streak">
+                  <AlertTriangle className="mr-2 h-4 w-4" /> Interruption ({interruptions})
+                </Button>
+                <Button onClick={handleStop} variant="destructive" size="lg">
+                  <Square className="mr-2 h-4 w-4" /> End
+                </Button>
+                <Button onClick={() => setFullscreen(false)} variant="ghost" size="lg">
+                  <Minimize2 className="mr-2 h-4 w-4" /> Exit
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <ReflectionModal
+        open={!!reflection}
+        onOpenChange={(o) => { if (!o) setReflection(null); }}
+        sessionId={reflection?.sessionId ?? null}
+        userId={user?.id ?? null}
+        initialTags={reflection?.tags ?? []}
+        durationSeconds={reflection?.duration ?? 0}
+        topic={reflection?.topic ?? ''}
+        onSaved={() => {
+          queryClient.invalidateQueries({ queryKey: ['session-history'] });
+          queryClient.invalidateQueries({ queryKey: ['learning-memory'] });
+        }}
+      />
     </Layout>
   );
 }

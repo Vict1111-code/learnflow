@@ -360,6 +360,51 @@ export type Database = {
         }
         Relationships: []
       }
+      session_reflections: {
+        Row: {
+          challenged: string | null
+          created_at: string
+          distractions: string | null
+          focus_rating: number | null
+          id: string
+          learned: string | null
+          mood: string | null
+          revise: string | null
+          session_id: string
+          tags: string[]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          challenged?: string | null
+          created_at?: string
+          distractions?: string | null
+          focus_rating?: number | null
+          id?: string
+          learned?: string | null
+          mood?: string | null
+          revise?: string | null
+          session_id: string
+          tags?: string[]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          challenged?: string | null
+          created_at?: string
+          distractions?: string | null
+          focus_rating?: number | null
+          id?: string
+          learned?: string | null
+          mood?: string | null
+          revise?: string | null
+          session_id?: string
+          tags?: string[]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       study_plans: {
         Row: {
           blocks: Json
@@ -410,6 +455,7 @@ export type Database = {
           interruptions: number
           notes: string | null
           started_at: string
+          tags: string[]
           target_duration_seconds: number | null
           topic: string
           user_id: string
@@ -426,6 +472,7 @@ export type Database = {
           interruptions?: number
           notes?: string | null
           started_at?: string
+          tags?: string[]
           target_duration_seconds?: number | null
           topic: string
           user_id: string
@@ -442,6 +489,7 @@ export type Database = {
           interruptions?: number
           notes?: string | null
           started_at?: string
+          tags?: string[]
           target_duration_seconds?: number | null
           topic?: string
           user_id?: string

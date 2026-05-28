@@ -24,6 +24,7 @@ import GoalDetail from "./pages/GoalDetail";
 import Analytics from "./pages/Analytics";
 import Portfolio from "./pages/Portfolio";
 import MentorDashboard from "./pages/MentorDashboard";
+import Memory from "./pages/Memory";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -40,6 +41,7 @@ const protectedRoutes: Array<{ path: string; element: JSX.Element }> = [
   { path: "/analytics", element: <Analytics /> },
   { path: "/portfolio", element: <Portfolio /> },
   { path: "/mentor", element: <MentorDashboard /> },
+  { path: "/memory", element: <Memory /> },
 ];
 
 const App = () => (
