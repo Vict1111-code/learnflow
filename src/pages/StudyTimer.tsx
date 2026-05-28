@@ -1,14 +1,25 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Layout from '@/components/Layout';
-import { motion } from 'framer-motion';
-import { Play, Pause, Square, RotateCcw, Zap, AlertTriangle, Clock, History } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Play, Pause, Square, RotateCcw, Zap, AlertTriangle, Clock, History, Maximize2, Minimize2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { startStudySession, endStudySession, getTodaySessions, getLearningGoals, getSessionHistory, type LearningGoal } from '@/lib/database';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import ReflectionModal from '@/components/study/ReflectionModal';
+import { Link } from 'react-router-dom';
 
 type TimerState = 'idle' | 'running' | 'paused';
+
+const MOTIVATIONS = [
+  'Deep work beats long work.',
+  'You are building memory, not just minutes.',
+  'Small reps. Big compounding.',
+  'Focus is a skill. You are training it now.',
+  'One concept truly understood > ten skimmed.',
+  'Breathe. Stay with the problem.',
+];
 
 const BLOCK_LABELS: Record<string, string> = {
   input: 'Input',
