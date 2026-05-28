@@ -613,3 +613,142 @@ export async function getActivityHeatmap(userId: string, days = 365) {
   });
   return map; // dateString -> total seconds
 }
+
+// =================== Daily Reports & Analytics ===================
+
+export interface DailyAggregate {
+  date: string; // YYYY-MM-DD
+  sessions: number;
+  focusSeconds: number;
+  xp: number;
+  interruptions: number;
+  reportSubmitted: boolean;
+}
+
+export async function getReportsHistory(userId: string, limit = 30): Promise<DailyReport[]> {
+  const { data, error } = await supabase
+    .from('daily_reports')
+    .select('*')
+    .eq('user_id', userId)
+    .order('report_date', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data || []) as DailyReport[];
+}
+
+export async function getDailyStats(userId: string, days = 14): Promise<DailyAggregate[]> {
+  const since = new Date();
+  since.setDate(since.getDate() - (days - 1));
+  const sinceISO = since.toISOString().slice(0, 10);
+
+  const [sessionsRes, reportsRes] = await Promise.all([
+    supabase
+      .from('study_sessions')
+      .select('started_at, duration_seconds, xp_earned, interruptions, ended_at')
+      .eq('user_id', userId)
+      .not('ended_at', 'is', null)
+      .gte('started_at', `${sinceISO}T00:00:00`),
+    supabase
+      .from('daily_reports')
+      .select('report_date, xp_earned')
+      .eq('user_id', userId)
+      .gte('report_date', sinceISO),
+  ]);
+  if (sessionsRes.error) throw sessionsRes.error;
+  if (reportsRes.error) throw reportsRes.error;
+
+  const byDay = new Map<string, DailyAggregate>();
+  for (let i = 0; i < days; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - (days - 1 - i));
+    const key = d.toISOString().slice(0, 10);
+    byDay.set(key, { date: key, sessions: 0, focusSeconds: 0, xp: 0, interruptions: 0, reportSubmitted: false });
+  }
+  (sessionsRes.data || []).forEach((s: any) => {
+    const key = s.started_at.slice(0, 10);
+    const row = byDay.get(key);
+    if (!row) return;
+    row.sessions += 1;
+    row.focusSeconds += s.duration_seconds || 0;
+    row.xp += s.xp_earned || 0;
+    row.interruptions += s.interruptions || 0;
+  });
+  (reportsRes.data || []).forEach((r: any) => {
+    const row = byDay.get(r.report_date);
+    if (!row) return;
+    row.reportSubmitted = true;
+    row.xp += r.xp_earned || 0;
+  });
+  return Array.from(byDay.values());
+}
+
+export async function getProductiveHours(userId: string, days = 30): Promise<{ hour: number; focusSeconds: number }[]> {
+  const since = new Date();
+  since.setDate(since.getDate() - days);
+  const { data, error } = await supabase
+    .from('study_sessions')
+    .select('started_at, duration_seconds')
+    .eq('user_id', userId)
+    .not('ended_at', 'is', null)
+    .gte('started_at', since.toISOString());
+  if (error) throw error;
+  const buckets = Array.from({ length: 24 }, (_, h) => ({ hour: h, focusSeconds: 0 }));
+  (data || []).forEach((s: any) => {
+    const h = new Date(s.started_at).getHours();
+    buckets[h].focusSeconds += s.duration_seconds || 0;
+  });
+  return buckets;
+}
+
+export interface WeeklySummary {
+  totalHours: number;
+  totalSessions: number;
+  totalXp: number;
+  reportsSubmitted: number;
+  strongestTopic: string | null;
+  weakestDay: string | null;
+  streakGrowth: number;
+  bestDay: { date: string; focusSeconds: number } | null;
+}
+
+export async function getWeeklySummary(userId: string): Promise<WeeklySummary> {
+  const stats = await getDailyStats(userId, 7);
+  const { data: sessions, error } = await supabase
+    .from('study_sessions')
+    .select('topic, duration_seconds, started_at')
+    .eq('user_id', userId)
+    .not('ended_at', 'is', null)
+    .gte('started_at', new Date(Date.now() - 7 * 86400000).toISOString());
+  if (error) throw error;
+
+  const topicTotals = new Map<string, number>();
+  (sessions || []).forEach((s: any) => {
+    const t = (s.topic || 'General').trim() || 'General';
+    topicTotals.set(t, (topicTotals.get(t) || 0) + (s.duration_seconds || 0));
+  });
+  const strongestTopic = [...topicTotals.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const weekdayTotals = new Map<string, number>();
+  stats.forEach(s => {
+    const dn = dayNames[new Date(s.date + 'T00:00:00').getDay()];
+    weekdayTotals.set(dn, (weekdayTotals.get(dn) || 0) + s.focusSeconds);
+  });
+  const weakestDay = [...weekdayTotals.entries()].sort((a, b) => a[1] - b[1])[0]?.[0] ?? null;
+  const bestDay = stats.reduce<{ date: string; focusSeconds: number } | null>(
+    (best, s) => (!best || s.focusSeconds > best.focusSeconds ? { date: s.date, focusSeconds: s.focusSeconds } : best),
+    null
+  );
+
+  return {
+    totalHours: stats.reduce((a, s) => a + s.focusSeconds, 0) / 3600,
+    totalSessions: stats.reduce((a, s) => a + s.sessions, 0),
+    totalXp: stats.reduce((a, s) => a + s.xp, 0),
+    reportsSubmitted: stats.filter(s => s.reportSubmitted).length,
+    strongestTopic,
+    weakestDay,
+    streakGrowth: stats.filter(s => s.focusSeconds > 0).length,
+    bestDay,
+  };
+}
+
