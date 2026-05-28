@@ -290,45 +290,72 @@ export type Database = {
       }
       profiles: {
         Row: {
+          ai_tutor_enabled: boolean | null
           avatar_url: string | null
           created_at: string
+          daily_study_target_minutes: number | null
+          email: string | null
+          email_verified: boolean
           focus: string | null
           id: string
+          interests: Json | null
           is_public: boolean
           last_active_date: string | null
           level: string
           name: string
+          onboarding_completed: boolean
+          skill_level: string | null
           streak: number
+          study_preferences: Json | null
           updated_at: string
           user_id: string
+          username: string | null
           xp: number
         }
         Insert: {
+          ai_tutor_enabled?: boolean | null
           avatar_url?: string | null
           created_at?: string
+          daily_study_target_minutes?: number | null
+          email?: string | null
+          email_verified?: boolean
           focus?: string | null
           id?: string
+          interests?: Json | null
           is_public?: boolean
           last_active_date?: string | null
           level?: string
           name: string
+          onboarding_completed?: boolean
+          skill_level?: string | null
           streak?: number
+          study_preferences?: Json | null
           updated_at?: string
           user_id: string
+          username?: string | null
           xp?: number
         }
         Update: {
+          ai_tutor_enabled?: boolean | null
           avatar_url?: string | null
           created_at?: string
+          daily_study_target_minutes?: number | null
+          email?: string | null
+          email_verified?: boolean
           focus?: string | null
           id?: string
+          interests?: Json | null
           is_public?: boolean
           last_active_date?: string | null
           level?: string
           name?: string
+          onboarding_completed?: boolean
+          skill_level?: string | null
           streak?: number
+          study_preferences?: Json | null
           updated_at?: string
           user_id?: string
+          username?: string | null
           xp?: number
         }
         Relationships: []
