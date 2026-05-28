@@ -28,23 +28,72 @@ const POMODORO_PRESETS = [
 export default function StudyTimer() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [seconds, setSeconds] = useState(0);
-  const [state, setState] = useState<TimerState>('idle');
-  const [selectedBlock, setSelectedBlock] = useState('practice');
-  const [topic, setTopic] = useState('');
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
-  const [selectedGoalId, setSelectedGoalId] = useState<string>('');
-  const [selectedConceptId, setSelectedConceptId] = useState<string>('');
-  const [notes, setNotes] = useState('');
-  const [interruptions, setInterruptions] = useState(0);
-  const [targetDuration, setTargetDuration] = useState(25 * 60);
-  const [customMinutes, setCustomMinutes] = useState('');
-  const [isCustomDuration, setIsCustomDuration] = useState(false);
 
+  // Persisted timer state — survives tab switches, remounts, and background throttling.
+  const STORAGE_KEY = 'learnflow:study-timer';
+  type PersistedTimer = {
+    state: TimerState;
+    startedAt: number | null;
+    accumulated: number;
+    sessionId: string | null;
+    block: string;
+    topic: string;
+    goalId: string;
+    conceptId: string;
+    notes: string;
+    interruptions: number;
+    targetDuration: number;
+    isCustomDuration: boolean;
+    customMinutes: string;
+  };
+  const loadPersisted = (): Partial<PersistedTimer> => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  };
+  const persisted = loadPersisted();
+
+  const [state, setState] = useState<TimerState>(persisted.state ?? 'idle');
+  const [startedAt, setStartedAt] = useState<number | null>(persisted.startedAt ?? null);
+  const [accumulated, setAccumulated] = useState<number>(persisted.accumulated ?? 0);
+  const [seconds, setSeconds] = useState<number>(
+    (persisted.accumulated ?? 0) +
+      (persisted.state === 'running' && persisted.startedAt
+        ? Math.floor((Date.now() - persisted.startedAt) / 1000)
+        : 0)
+  );
+
+  const [selectedBlock, setSelectedBlock] = useState(persisted.block ?? 'practice');
+  const [topic, setTopic] = useState(persisted.topic ?? '');
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(persisted.sessionId ?? null);
+  const [selectedGoalId, setSelectedGoalId] = useState<string>(persisted.goalId ?? '');
+  const [selectedConceptId, setSelectedConceptId] = useState<string>(persisted.conceptId ?? '');
+  const [notes, setNotes] = useState(persisted.notes ?? '');
+  const [interruptions, setInterruptions] = useState(persisted.interruptions ?? 0);
+  const [targetDuration, setTargetDuration] = useState(persisted.targetDuration ?? 25 * 60);
+  const [customMinutes, setCustomMinutes] = useState(persisted.customMinutes ?? '');
+  const [isCustomDuration, setIsCustomDuration] = useState(persisted.isCustomDuration ?? false);
+
+  useEffect(() => {
+    const data: PersistedTimer = {
+      state, startedAt, accumulated,
+      sessionId: currentSessionId,
+      block: selectedBlock, topic,
+      goalId: selectedGoalId, conceptId: selectedConceptId,
+      notes, interruptions, targetDuration, isCustomDuration, customMinutes,
+    };
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch {}
+  }, [state, startedAt, accumulated, currentSessionId, selectedBlock, topic, selectedGoalId, selectedConceptId, notes, interruptions, targetDuration, isCustomDuration, customMinutes]);
+
+  // Disable refetchOnWindowFocus so returning to the tab doesn't trigger reloads.
   const { data: goals } = useQuery({
     queryKey: ['learning-goals', user?.id],
     queryFn: () => user ? getLearningGoals(user.id) : [],
     enabled: !!user,
+    refetchOnWindowFocus: false,
   });
 
   const selectedGoal = goals?.find(g => g.id === selectedGoalId) as LearningGoal | undefined;
@@ -54,24 +103,44 @@ export default function StudyTimer() {
     queryKey: ['today-sessions', user?.id],
     queryFn: () => user ? getTodaySessions(user.id) : [],
     enabled: !!user,
+    refetchOnWindowFocus: false,
   });
 
   const { data: sessionHistory } = useQuery({
     queryKey: ['session-history', user?.id],
     queryFn: () => user ? getSessionHistory(user.id, 10) : [],
     enabled: !!user,
+    refetchOnWindowFocus: false,
   });
 
   const sessionsToday = todaySessions?.length || 0;
   const totalSeconds = todaySessions?.reduce((acc, s) => acc + (s.duration_seconds || 0), 0) || 0;
   const totalXp = todaySessions?.reduce((acc, s) => acc + (s.xp_earned || 0), 0) || 0;
 
+  // Wall-clock tick — recomputes from timestamps so background throttling never loses time.
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (state === 'running') {
-      interval = setInterval(() => setSeconds(s => s + 1), 1000);
-    }
-    return () => clearInterval(interval);
+    const tick = () => setSeconds(
+      accumulated + (state === 'running' && startedAt ? Math.floor((Date.now() - startedAt) / 1000) : 0)
+    );
+    tick();
+    if (state !== 'running') return;
+    const interval = setInterval(tick, 1000);
+    const onVisible = () => tick();
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
+  }, [state, startedAt, accumulated]);
+
+  // Warn before closing tab while a session is active.
+  useEffect(() => {
+    if (state === 'idle') return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
   }, [state]);
 
   const formatTime = useCallback((s: number) => {
@@ -85,8 +154,9 @@ export default function StudyTimer() {
 
   const handleStart = async () => {
     if (!user) return;
-    
+
     if (state === 'paused') {
+      setStartedAt(Date.now());
       setState('running');
       return;
     }
@@ -99,19 +169,29 @@ export default function StudyTimer() {
         targetDuration: targetDuration || undefined,
       });
       setCurrentSessionId(session.id);
+      setAccumulated(0);
+      setStartedAt(Date.now());
       setState('running');
     } catch (error) {
       toast.error('Failed to start session');
     }
   };
 
-  const handlePause = () => setState('paused');
+  const handlePause = () => {
+    if (state === 'running' && startedAt) {
+      setAccumulated(a => a + Math.floor((Date.now() - startedAt) / 1000));
+      setStartedAt(null);
+    }
+    setState('paused');
+  };
 
   const handleStop = async () => {
-    if (currentSessionId && seconds > 0) {
+    const finalSeconds =
+      accumulated + (state === 'running' && startedAt ? Math.floor((Date.now() - startedAt) / 1000) : 0);
+    if (currentSessionId && finalSeconds > 0) {
       try {
-        await endStudySession(currentSessionId, seconds, interruptions);
-        const xpEarned = Math.min(Math.floor(seconds / 60), 60);
+        await endStudySession(currentSessionId, finalSeconds, interruptions);
+        const xpEarned = Math.min(Math.floor(finalSeconds / 60), 60);
         toast.success(`Session ended! +${xpEarned} XP earned`);
         queryClient.invalidateQueries({ queryKey: ['today-sessions'] });
         queryClient.invalidateQueries({ queryKey: ['session-history'] });
@@ -121,13 +201,21 @@ export default function StudyTimer() {
       }
     }
     setState('idle');
+    setStartedAt(null);
+    setAccumulated(0);
     setSeconds(0);
     setCurrentSessionId(null);
     setInterruptions(0);
     setNotes('');
+    try { localStorage.removeItem('learnflow:study-timer'); } catch {}
   };
 
-  const handleReset = () => setSeconds(0);
+  const handleReset = () => {
+    setAccumulated(0);
+    setStartedAt(state === 'running' ? Date.now() : null);
+    setSeconds(0);
+  };
+
 
   return (
     <Layout>
