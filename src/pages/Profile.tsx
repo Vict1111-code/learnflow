@@ -186,6 +186,8 @@ export default function Profile() {
             </motion.div>
           ))}
         </div>
+
+        {user && <AchievementBadges userId={user.id} />}
       </div>
     </Layout>
   );
