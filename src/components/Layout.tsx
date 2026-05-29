@@ -2,12 +2,14 @@ import { ReactNode } from 'react';
 import AppSidebar from './AppSidebar';
 import MobileTopBar from './MobileTopBar';
 import MobileBottomNav from './MobileBottomNav';
+import { useAchievementNotifications } from '@/hooks/useAchievementNotifications';
 
 interface LayoutProps {
   children: ReactNode;
 }
 
 export default function Layout({ children }: LayoutProps) {
+  useAchievementNotifications();
   return (
     <div className="min-h-screen bg-background">
       <AppSidebar />
