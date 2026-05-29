@@ -8,6 +8,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import AvatarUpload from '@/components/AvatarUpload';
+import AchievementBadges from '@/components/AchievementBadges';
 
 const levels = [
   { name: 'Beginner', min: 0, max: 1000 },
