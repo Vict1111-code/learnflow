@@ -1,73 +1,232 @@
-# Welcome to your Lovable project
+# LearnFlow
 
-## Project info
+## Project URL: https://getlearnflow.lovable.app
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+### Build Consistency. Master Skills.
 
-## How can I edit this code?
+LearnFlow is a modern learning and focus platform designed to help students, self-learners, and developers stay consistent, track progress, and build mastery through structured learning systems, accountability, and collaborative growth.
 
-There are several ways of editing your application.
+---
 
-**Use Lovable**
+# 🚀 Overview
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+LearnFlow combines:
 
-Changes made via Lovable will be committed automatically to this repo.
+* Focus sessions
+* Learning memory
+* Daily reports
+* Goal tracking
+* Community collaboration
+* Mentorship systems
+* Productivity analytics
+* Gamification
 
-**Use your preferred IDE**
+into one unified learning ecosystem.
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+The platform is built to help learners:
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+* stay disciplined
+* reduce inconsistency
+* organize their learning journey
+* measure real progress
+* grow through accountability and structure
 
-Follow these steps:
+---
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
+# ✨ Core Features
+
+## 📚 Study Session System
+
+* Pomodoro and focus sessions
+* Session goals and topics
+* Focus tracking
+* Persistent session recovery
+* Session reflections and notes
+
+---
+
+## 🧠 Learning Memory
+
+* Searchable session history
+* Reflection archive
+* Learning timeline
+* Concept tracking
+* Persistent learning records
+
+---
+
+## 📊 Daily Reports & Analytics
+
+* Focus hours tracking
+* Session statistics
+* Consistency insights
+* Productivity trends
+* Progress visualization
+
+---
+
+## 🏆 Gamification
+
+* XP system
+* Learning streaks
+* Levels and achievements
+* Consistency rewards
+
+---
+
+## 👥 Community System
+
+* Questions and discussions
+* Study logs
+* Resource sharing
+* Project showcases
+* Accountability groups
+
+---
+
+## 🎯 Mentor System
+
+* Mentor and mentee tracking
+* Progress monitoring
+* Goal reviews
+* Accountability feedback
+
+---
+
+# 🛠 Tech Stack
+
+LearnFlow is built with:
+
+* React
+* TypeScript
+* Vite
+* Tailwind CSS
+* shadcn/ui
+* Supabase
+* Lovable
+
+---
+
+# 📱 Platform Goals
+
+LearnFlow is designed to become:
+
+* a learning operating system
+* a productivity platform for students
+* a structured skill mastery ecosystem
+* an accountability-driven learning experience
+
+The long-term vision includes:
+
+* AI-powered learning intelligence
+* adaptive study systems
+* personalized learning memory
+* mentor analytics
+* collaborative study environments
+
+---
+
+# ⚡ Getting Started
+
+## 1. Clone the Repository
+
+```bash
 git clone <YOUR_GIT_URL>
+```
 
-# Step 2: Navigate to the project directory.
+---
+
+## 2. Navigate to the Project Folder
+
+```bash
 cd <YOUR_PROJECT_NAME>
+```
 
-# Step 3: Install the necessary dependencies.
-npm i
+---
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+## 3. Install Dependencies
+
+```bash
+npm install
+```
+
+---
+
+## 4. Start Development Server
+
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+The app will run locally with hot reload enabled.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+---
 
-**Use GitHub Codespaces**
+# 🌐 Deployment
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+LearnFlow can be deployed directly through Lovable.
 
-## What technologies are used for this project?
+### Deploy Steps
 
-This project is built with:
+1. Open your Lovable project
+2. Click **Share**
+3. Click **Publish**
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+---
 
-## How can I deploy this project?
+# 🔗 Custom Domain
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+To connect a custom domain:
 
-## Can I connect a custom domain to my Lovable project?
+1. Go to:
+   **Project → Settings → Domains**
+2. Click:
+   **Connect Domain**
 
-Yes, you can!
+---
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+# 📌 Project Status
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+Current Phase:
+
+### Phase 1 — Free Platform Foundation
+
+Focused on:
+
+* platform stability
+* learning workflows
+* persistence
+* community systems
+* dashboards
+* mentor features
+* gamification
+* responsiveness
+
+---
+
+# 🧭 Future Roadmap
+
+Upcoming features include:
+
+* AI study assistant
+* adaptive learning system
+* AI-generated quizzes
+* flashcards
+* knowledge graphs
+* semantic learning memory
+* collaborative study rooms
+* AI mentor assistant
+
+---
+
+# 🤝 Contribution
+
+Contributions, ideas, and feedback are welcome.
+
+LearnFlow is being built to help learners stay consistent, accountable, and growth-focused.
+
+---
+
+# 📄 License
+
+This project is currently private and under active development.
