@@ -98,9 +98,12 @@ export default function Profile() {
       <div className="space-y-8">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass-card rounded-2xl p-8">
           <div className="flex items-center gap-6">
-            <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-primary text-3xl font-bold text-primary-foreground shadow-glow-primary">
-              {(profile?.name || user?.email)?.charAt(0)?.toUpperCase() || 'U'}
-            </div>
+            <AvatarUpload
+              userId={user!.id}
+              avatarUrl={profile?.avatar_url || null}
+              fallback={(profile?.name || user?.email)?.charAt(0)?.toUpperCase() || 'U'}
+              onUploaded={() => queryClient.invalidateQueries({ queryKey: ['profile'] })}
+            />
             <div className="flex-1">
               {editing ? (
                 <div className="space-y-2">
