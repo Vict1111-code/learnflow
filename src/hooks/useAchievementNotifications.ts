@@ -17,6 +17,9 @@ export function useAchievementNotifications() {
 
     let cancelled = false;
 
+    // Backfill: re-evaluate so achievements unlock for pre-existing activity
+    (supabase as any).rpc('evaluate_user_achievements', { p_user_id: user.id });
+
     const check = async () => {
       const { data, error } = await (supabase as any)
         .from('user_achievements')
