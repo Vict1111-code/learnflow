@@ -66,9 +66,17 @@ export default function AppSidebar({ variant = 'fixed', onNavigate }: AppSidebar
       {/* User quick stats */}
       <div className="mx-4 mb-4 rounded-lg border border-border/50 bg-muted/50 p-3">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-primary text-sm font-bold text-primary-foreground">
-            {displayName.charAt(0).toUpperCase()}
-          </div>
+          {profile?.avatar_url ? (
+            <img
+              src={profile.avatar_url}
+              alt={displayName}
+              className="h-10 w-10 rounded-full object-cover"
+            />
+          ) : (
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-primary text-sm font-bold text-primary-foreground">
+              {displayName.charAt(0).toUpperCase()}
+            </div>
+          )}
           <div className="flex-1 min-w-0">
             <p className="truncate text-sm font-medium text-foreground">{displayName}</p>
             <p className="text-xs text-muted-foreground">{level}</p>
