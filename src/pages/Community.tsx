@@ -1,223 +1,164 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Layout from '@/components/Layout';
 import { motion } from 'framer-motion';
-import { ArrowUp, MessageSquare, HelpCircle, Lightbulb, Trophy, Link2, Plus } from 'lucide-react';
+import { Plus, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getPosts, createPost, toggleUpvote, getProfile } from '@/lib/database';
+import { useQuery } from '@tanstack/react-query';
+import { getReactionsForPosts, getAuthorProfiles } from '@/lib/database';
 import { Button } from '@/components/ui/button';
-import { toast } from 'sonner';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import PostCard, { POST_TYPE_META } from '@/components/community/PostCard';
+import CreatePostDialog from '@/components/community/CreatePostDialog';
+import TrendingSidebar from '@/components/community/TrendingSidebar';
+import StudyGroupsTab from '@/components/community/StudyGroupsTab';
 
-const typeIcons: Record<string, typeof HelpCircle> = {
-  question: HelpCircle,
-  explanation: Lightbulb,
-  achievement: Trophy,
-  resource: Link2,
-};
-
-const typeColors: Record<string, string> = {
-  question: 'bg-primary/10 text-primary',
-  explanation: 'bg-xp/10 text-xp',
-  achievement: 'bg-streak/10 text-streak',
-  resource: 'bg-level/10 text-level',
-};
-
-const filters = ['All', 'Questions', 'Explanations', 'Achievements', 'Resources'];
+const FILTERS: Array<{ id: string; label: string }> = [
+  { id: 'all', label: 'All' },
+  { id: 'question', label: 'Questions' },
+  { id: 'achievement', label: 'Achievements' },
+  { id: 'study_log', label: 'Study Logs' },
+  { id: 'resource', label: 'Resources' },
+  { id: 'project', label: 'Projects' },
+  { id: 'code_snippet', label: 'Code' },
+];
 
 export default function Community() {
-  const { user } = useAuth();
-  const queryClient = useQueryClient();
-  const [activeFilter, setActiveFilter] = useState('All');
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [newPost, setNewPost] = useState({ type: 'question', title: '', content: '', topic: '' });
-  const [creating, setCreating] = useState(false);
+  useAuth();
+  const [filter, setFilter] = useState<string>('all');
+  const [topicFilter, setTopicFilter] = useState<string | null>(null);
+  const [sort, setSort] = useState<'recent' | 'trending'>('recent');
+  const [createOpen, setCreateOpen] = useState(false);
 
-  const { data: posts, isLoading } = useQuery({
-    queryKey: ['posts', activeFilter],
-    queryFn: () => getPosts(activeFilter),
+  const { data: rawPosts = [], isLoading } = useQuery({
+    queryKey: ['posts', filter],
+    queryFn: async () => {
+      // Map our id to legacy filter format
+      const f = filter === 'all' ? 'All' : filter;
+      // Bypass legacy mapping: directly query
+      const { supabase } = await import('@/integrations/supabase/client');
+      let q = supabase.from('community_posts').select('*').order('created_at', { ascending: false });
+      if (filter !== 'all') q = q.eq('post_type', filter);
+      const { data } = await q;
+      return data || [];
+    },
   });
 
-  const handleUpvote = async (postId: string) => {
-    if (!user) return;
-    try {
-      await toggleUpvote(postId, user.id);
-      queryClient.invalidateQueries({ queryKey: ['posts'] });
-    } catch (error) {
-      toast.error('Failed to update vote');
-    }
-  };
+  const posts = useMemo(() => {
+    let arr = [...rawPosts];
+    if (topicFilter) arr = arr.filter((p: any) => p.topic === topicFilter);
+    if (sort === 'trending') arr.sort((a: any, b: any) => b.upvotes - a.upvotes);
+    return arr;
+  }, [rawPosts, topicFilter, sort]);
 
-  const handleCreatePost = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user) return;
+  const postIds = useMemo(() => posts.map((p: any) => p.id), [posts]);
+  const authorIds = useMemo(() => Array.from(new Set(posts.map((p: any) => p.user_id))), [posts]);
 
-    setCreating(true);
-    try {
-      await createPost({
-        user_id: user.id,
-        post_type: newPost.type,
-        title: newPost.title,
-        content: newPost.content,
-        topic: newPost.topic,
-      });
-      toast.success('Post created!');
-      setShowCreateModal(false);
-      setNewPost({ type: 'question', title: '', content: '', topic: '' });
-      queryClient.invalidateQueries({ queryKey: ['posts'] });
-    } catch (error) {
-      toast.error('Failed to create post');
-    } finally {
-      setCreating(false);
-    }
-  };
+  const { data: reactions = [] } = useQuery({
+    queryKey: ['post-reactions', postIds.join(',')],
+    queryFn: () => getReactionsForPosts(postIds),
+    enabled: postIds.length > 0,
+  });
+
+  const { data: authors = {} } = useQuery({
+    queryKey: ['post-authors', authorIds.join(',')],
+    queryFn: () => getAuthorProfiles(authorIds),
+    enabled: authorIds.length > 0,
+  });
 
   return (
     <Layout>
       <div className="space-y-6">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="font-display text-3xl font-bold text-foreground">Community</h1>
-            <p className="mt-1 text-muted-foreground">Learn together. Help others. Earn XP.</p>
+            <h1 className="font-display text-3xl font-bold">Community</h1>
+            <p className="mt-1 text-sm text-muted-foreground">Learn together. Help others. Earn XP.</p>
           </div>
-          <Button onClick={() => setShowCreateModal(true)} className="bg-gradient-primary text-primary-foreground hover:opacity-90">
+          <Button onClick={() => setCreateOpen(true)} className="bg-gradient-primary text-primary-foreground hover:opacity-90">
             <Plus className="mr-2 h-4 w-4" /> New Post
           </Button>
         </motion.div>
 
-        {/* Filters */}
-        <div className="flex gap-2">
-          {filters.map((f) => (
-            <button
-              key={f}
-              onClick={() => setActiveFilter(f)}
-              className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${activeFilter === f ? 'bg-gradient-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'}`}
-            >
-              {f}
-            </button>
-          ))}
-        </div>
+        <Tabs defaultValue="feed">
+          <TabsList>
+            <TabsTrigger value="feed">Feed</TabsTrigger>
+            <TabsTrigger value="groups">Study Groups</TabsTrigger>
+          </TabsList>
 
-        {/* Posts */}
-        {isLoading ? (
-          <div className="flex justify-center py-12">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-          </div>
-        ) : posts && posts.length > 0 ? (
-          <div className="space-y-4">
-            {posts.map((post, i) => {
-              const Icon = typeIcons[post.post_type] || HelpCircle;
-              return (
-                <motion.div
-                  key={post.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.08 }}
-                  className="glass-card rounded-xl p-5"
-                >
-                  <div className="flex gap-4">
-                    {/* Votes */}
-                    <div className="flex flex-col items-center gap-1">
+          <TabsContent value="feed" className="mt-4">
+            <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
+              <div className="min-w-0 space-y-4">
+                {/* Filters */}
+                <div className="flex flex-wrap items-center gap-2">
+                  {FILTERS.map((f) => {
+                    const meta = f.id === 'all' ? null : POST_TYPE_META[f.id];
+                    const Icon = meta?.icon;
+                    const active = filter === f.id;
+                    return (
                       <button
-                        onClick={() => handleUpvote(post.id)}
-                        className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                        key={f.id}
+                        onClick={() => setFilter(f.id)}
+                        className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${active ? 'bg-gradient-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'}`}
                       >
-                        <ArrowUp className="h-4 w-4" />
+                        {Icon && <Icon className="h-3.5 w-3.5" />} {f.label}
                       </button>
-                      <span className="text-sm font-bold text-foreground">{post.upvotes}</span>
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="mb-2 flex items-center gap-2">
-                        <span className={`flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase ${typeColors[post.post_type]}`}>
-                          <Icon className="h-3 w-3" /> {post.post_type}
-                        </span>
-                        <span className="rounded-md bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">{post.topic}</span>
-                      </div>
-                      <h3 className="text-base font-semibold text-foreground">{post.title}</h3>
-                      <p className="mt-1 text-sm text-muted-foreground line-clamp-2">{post.content}</p>
-                      <div className="mt-3 flex items-center gap-4 text-xs text-muted-foreground">
-                        <span>{new Date(post.created_at).toLocaleDateString()}</span>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="py-12 text-center">
-            <p className="text-muted-foreground">No posts yet. Be the first to share!</p>
-          </div>
-        )}
-
-        {/* Create Post Modal */}
-        {showCreateModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="w-full max-w-lg glass-card rounded-2xl p-6"
-            >
-              <h2 className="font-display text-xl font-bold text-foreground">Create Post</h2>
-              <form onSubmit={handleCreatePost} className="mt-4 space-y-4">
-                <div>
-                  <label className="mb-1.5 block text-sm text-muted-foreground">Type</label>
-                  <div className="flex gap-2">
-                    {['question', 'explanation', 'achievement', 'resource'].map((type) => (
+                    );
+                  })}
+                  <div className="ml-auto flex gap-1 rounded-lg bg-muted p-1">
+                    {(['recent', 'trending'] as const).map((s) => (
                       <button
-                        key={type}
-                        type="button"
-                        onClick={() => setNewPost(p => ({ ...p, type }))}
-                        className={`rounded-lg px-3 py-1.5 text-sm font-medium capitalize transition-colors ${newPost.type === type ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
+                        key={s}
+                        onClick={() => setSort(s)}
+                        className={`rounded-md px-3 py-1 text-xs font-medium capitalize transition-colors ${sort === s ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
                       >
-                        {type}
+                        {s}
                       </button>
                     ))}
                   </div>
                 </div>
-                <div>
-                  <label className="mb-1.5 block text-sm text-muted-foreground">Title</label>
-                  <input
-                    type="text"
-                    value={newPost.title}
-                    onChange={(e) => setNewPost(p => ({ ...p, title: e.target.value }))}
-                    required
-                    className="w-full rounded-lg border border-border bg-muted/50 px-4 py-2.5 text-sm text-foreground focus:border-primary focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-sm text-muted-foreground">Topic</label>
-                  <input
-                    type="text"
-                    value={newPost.topic}
-                    onChange={(e) => setNewPost(p => ({ ...p, topic: e.target.value }))}
-                    placeholder="e.g., React, TypeScript, General"
-                    required
-                    className="w-full rounded-lg border border-border bg-muted/50 px-4 py-2.5 text-sm text-foreground focus:border-primary focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-sm text-muted-foreground">Content</label>
-                  <textarea
-                    value={newPost.content}
-                    onChange={(e) => setNewPost(p => ({ ...p, content: e.target.value }))}
-                    rows={4}
-                    required
-                    className="w-full rounded-lg border border-border bg-muted/50 px-4 py-3 text-sm text-foreground focus:border-primary focus:outline-none"
-                  />
-                </div>
-                <div className="flex gap-3">
-                  <Button type="button" variant="outline" onClick={() => setShowCreateModal(false)} className="flex-1">
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={creating} className="flex-1 bg-gradient-primary text-primary-foreground">
-                    {creating ? 'Posting...' : 'Post'}
-                  </Button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
+
+                {topicFilter && (
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-muted-foreground">Filtered by topic:</span>
+                    <button
+                      onClick={() => setTopicFilter(null)}
+                      className="rounded-full bg-primary/10 px-2 py-1 font-medium text-primary hover:bg-primary/20"
+                    >
+                      #{topicFilter} ✕
+                    </button>
+                  </div>
+                )}
+
+                {isLoading ? (
+                  <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+                ) : posts.length === 0 ? (
+                  <div className="glass-card rounded-xl p-12 text-center">
+                    <p className="text-sm text-muted-foreground">No posts yet. Be the first to share.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {posts.map((p: any, i: number) => (
+                      <PostCard
+                        key={p.id}
+                        post={p}
+                        reactions={reactions as any}
+                        author={(authors as any)[p.user_id]}
+                        index={i}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <TrendingSidebar onTopicClick={(t) => { setTopicFilter(t); setFilter('all'); }} />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="groups" className="mt-4">
+            <StudyGroupsTab />
+          </TabsContent>
+        </Tabs>
+
+        <CreatePostDialog open={createOpen} onOpenChange={setCreateOpen} />
       </div>
     </Layout>
   );

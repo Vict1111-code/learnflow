@@ -367,22 +367,206 @@ export async function getPosts(filter?: string) {
   return data || [];
 }
 
+export const REACTION_TYPES = ['helpful', 'insightful', 'motivating', 'solved', 'upvote'] as const;
+export type ReactionType = typeof REACTION_TYPES[number];
+
 export async function toggleUpvote(postId: string, userId: string) {
-  const { data: existing } = await supabase
-    .from('post_upvotes')
+  return toggleReaction(postId, userId, 'upvote');
+}
+
+export async function toggleReaction(postId: string, userId: string, reaction: ReactionType) {
+  const { data: existing } = await (supabase as any)
+    .from('post_reactions')
     .select('id')
     .eq('post_id', postId)
     .eq('user_id', userId)
+    .eq('reaction_type', reaction)
     .maybeSingle();
 
   if (existing) {
-    // Counter is auto-decremented by DB trigger
-    await supabase.from('post_upvotes').delete().eq('id', existing.id);
-  } else {
-    // Counter is auto-incremented by DB trigger; UNIQUE constraint prevents duplicates
-    await supabase.from('post_upvotes').insert({ post_id: postId, user_id: userId });
+    await (supabase as any).from('post_reactions').delete().eq('id', existing.id);
+    return false;
   }
+  await (supabase as any).from('post_reactions').insert({ post_id: postId, user_id: userId, reaction_type: reaction });
+  return true;
 }
+
+export async function getReactionsForPosts(postIds: string[]) {
+  if (postIds.length === 0) return [];
+  const { data } = await (supabase as any)
+    .from('post_reactions')
+    .select('post_id, user_id, reaction_type')
+    .in('post_id', postIds);
+  return data || [];
+}
+
+// Comments (with nesting)
+export interface PostComment {
+  id: string;
+  post_id: string;
+  user_id: string;
+  content: string;
+  parent_id: string | null;
+  created_at: string;
+}
+
+export async function getComments(postId: string): Promise<PostComment[]> {
+  const { data } = await (supabase as any)
+    .from('post_comments')
+    .select('*')
+    .eq('post_id', postId)
+    .order('created_at', { ascending: true });
+  return (data as PostComment[]) || [];
+}
+
+export async function addComment(postId: string, userId: string, content: string, parentId?: string | null) {
+  const { error } = await (supabase as any)
+    .from('post_comments')
+    .insert({ post_id: postId, user_id: userId, content, parent_id: parentId ?? null });
+  if (error) throw error;
+}
+
+export async function deleteComment(commentId: string) {
+  const { error } = await supabase.from('post_comments').delete().eq('id', commentId);
+  if (error) throw error;
+}
+
+// Trending + contributors
+export async function getTopContributors(limit = 5) {
+  const { data, error } = await (supabase as any).rpc('get_top_contributors', { _limit: limit });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function getTrendingTopics(limit = 8) {
+  const { data, error } = await (supabase as any).rpc('get_trending_topics', { _limit: limit });
+  if (error) throw error;
+  return data || [];
+}
+
+// ---------- Study Groups ----------
+export interface StudyGroup {
+  id: string;
+  name: string;
+  description: string | null;
+  owner_id: string;
+  invite_code: string;
+  topic: string | null;
+  created_at: string;
+}
+
+export interface StudyGroupMember {
+  id: string;
+  group_id: string;
+  user_id: string;
+  role: 'owner' | 'member';
+  status: 'pending' | 'approved';
+  joined_at: string;
+}
+
+export async function listStudyGroups() {
+  const { data } = await (supabase as any)
+    .from('study_groups')
+    .select('*')
+    .order('created_at', { ascending: false });
+  return (data as StudyGroup[]) || [];
+}
+
+export async function getGroupMembers(groupId: string) {
+  const { data } = await (supabase as any)
+    .from('study_group_members')
+    .select('*')
+    .eq('group_id', groupId);
+  return (data as StudyGroupMember[]) || [];
+}
+
+export async function createStudyGroup(input: { name: string; description?: string; topic?: string; ownerId: string }) {
+  const { data, error } = await (supabase as any)
+    .from('study_groups')
+    .insert({ name: input.name, description: input.description ?? null, topic: input.topic ?? null, owner_id: input.ownerId })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as StudyGroup;
+}
+
+export async function requestJoinGroup(groupId: string, userId: string) {
+  const { error } = await (supabase as any)
+    .from('study_group_members')
+    .insert({ group_id: groupId, user_id: userId, role: 'member', status: 'pending' });
+  if (error) throw error;
+}
+
+export async function joinByInviteCode(code: string, userId: string) {
+  const { data: group, error } = await (supabase as any)
+    .from('study_groups')
+    .select('id')
+    .eq('invite_code', code.trim())
+    .maybeSingle();
+  if (error) throw error;
+  if (!group) throw new Error('Invalid invite code');
+  // Invite codes auto-approve
+  const { error: insErr } = await (supabase as any)
+    .from('study_group_members')
+    .insert({ group_id: group.id, user_id: userId, role: 'member', status: 'approved' });
+  if (insErr && !String(insErr.message).includes('duplicate')) throw insErr;
+  return group.id as string;
+}
+
+export async function approveGroupMember(memberId: string) {
+  const { error } = await (supabase as any)
+    .from('study_group_members')
+    .update({ status: 'approved' })
+    .eq('id', memberId);
+  if (error) throw error;
+}
+
+export async function removeGroupMember(memberId: string) {
+  const { error } = await (supabase as any).from('study_group_members').delete().eq('id', memberId);
+  if (error) throw error;
+}
+
+export async function leaveGroup(groupId: string, userId: string) {
+  const { error } = await (supabase as any)
+    .from('study_group_members')
+    .delete()
+    .eq('group_id', groupId)
+    .eq('user_id', userId);
+  if (error) throw error;
+}
+
+export async function listGroupChallenges(groupId: string) {
+  const { data } = await (supabase as any)
+    .from('group_challenges')
+    .select('*')
+    .eq('group_id', groupId)
+    .order('created_at', { ascending: false });
+  return data || [];
+}
+
+export async function createGroupChallenge(input: { groupId: string; title: string; description?: string; endDate?: string; createdBy: string }) {
+  const { error } = await (supabase as any).from('group_challenges').insert({
+    group_id: input.groupId,
+    title: input.title,
+    description: input.description ?? null,
+    end_date: input.endDate ?? null,
+    created_by: input.createdBy,
+  });
+  if (error) throw error;
+}
+
+// Helper: fetch lightweight author profiles for a set of user ids
+export async function getAuthorProfiles(userIds: string[]) {
+  if (userIds.length === 0) return {} as Record<string, { name: string; avatar_url: string | null }>;
+  const { data } = await supabase
+    .from('profiles')
+    .select('user_id, name, avatar_url')
+    .in('user_id', userIds);
+  const map: Record<string, { name: string; avatar_url: string | null }> = {};
+  (data || []).forEach((p: any) => { map[p.user_id] = { name: p.name, avatar_url: p.avatar_url }; });
+  return map;
+}
+
 
 // Leaderboard functions
 export async function getLeaderboard() {
