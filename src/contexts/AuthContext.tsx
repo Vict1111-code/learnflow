@@ -42,8 +42,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<ProfileSummary | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
 
-  const loadProfile = useCallback(async (uid: string) => {
-    setProfileLoading(true);
+  const loadProfile = useCallback(async (uid: string, { silent = false }: { silent?: boolean } = {}) => {
+    if (!silent) setProfileLoading(true);
     try {
       const { data } = await supabase
         .from('profiles')
@@ -61,19 +61,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           : { onboarding_completed: false, email_verified: false, username: null, name: null }
       );
     } finally {
-      setProfileLoading(false);
+      if (!silent) setProfileLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    let hasLoadedProfile = false;
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
       setSession(newSession);
       setUser(newSession?.user ?? null);
       setLoading(false);
       if (newSession?.user) {
-        // Defer Supabase calls to avoid deadlocks
-        setTimeout(() => loadProfile(newSession.user.id), 0);
+        // Only show loading state on first load or explicit sign-in.
+        // Skip reload on TOKEN_REFRESHED (fires on tab focus) to prevent remounts.
+        const isInitialOrSignIn = event === 'SIGNED_IN' || event === 'INITIAL_SESSION';
+        if (isInitialOrSignIn && !hasLoadedProfile) {
+          hasLoadedProfile = true;
+          setTimeout(() => loadProfile(newSession.user.id), 0);
+        } else if (event === 'USER_UPDATED') {
+          setTimeout(() => loadProfile(newSession.user.id, { silent: true }), 0);
+        }
+        // TOKEN_REFRESHED: ignore — session is still valid, no need to refetch profile.
       } else {
+        hasLoadedProfile = false;
         setProfile(null);
       }
     });
@@ -82,7 +92,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(existing);
       setUser(existing?.user ?? null);
       setLoading(false);
-      if (existing?.user) loadProfile(existing.user.id);
+      if (existing?.user && !hasLoadedProfile) {
+        hasLoadedProfile = true;
+        loadProfile(existing.user.id);
+      }
     });
 
     return () => subscription.unsubscribe();
