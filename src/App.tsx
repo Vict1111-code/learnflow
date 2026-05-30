@@ -27,7 +27,15 @@ import MentorDashboard from "./pages/MentorDashboard";
 import Memory from "./pages/Memory";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      staleTime: 30_000,
+    },
+  },
+});
 
 const protectedRoutes: Array<{ path: string; element: JSX.Element }> = [
   { path: "/dashboard", element: <Index /> },
