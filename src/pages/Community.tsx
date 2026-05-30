@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { Plus, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
-import { getPosts, getReactionsForPosts, getAuthorProfiles } from '@/lib/database';
+import { getReactionsForPosts, getAuthorProfiles } from '@/lib/database';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import PostCard, { POST_TYPE_META } from '@/components/community/PostCard';
