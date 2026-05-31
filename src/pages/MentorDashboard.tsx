@@ -279,80 +279,18 @@ export default function MentorDashboard() {
                       {isExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
                     </button>
 
-                    {isExpanded && menteeData && (
-                      <div className="border-t border-border/50 px-4 py-4 space-y-4">
-                        {/* Focus Score */}
-                        {menteeData.focus && (
-                          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                            {[
-                              { label: 'Focus Score', value: Math.round(menteeData.focus.score || 0) },
-                              { label: 'Consistency', value: Math.round(menteeData.focus.consistency || 0) },
-                              { label: 'Completion', value: Math.round(menteeData.focus.completion || 0) },
-                              { label: 'Focus', value: Math.round(menteeData.focus.interruption || 0) },
-                            ].map(s => (
-                              <div key={s.label} className="rounded-lg bg-muted/30 p-3 text-center">
-                                <p className="font-display text-lg font-bold text-foreground">{s.value}</p>
-                                <p className="text-xs text-muted-foreground">{s.label}</p>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Recent Sessions */}
-                        {menteeData.sessions.length > 0 && (
-                          <div>
-                            <h3 className="mb-2 text-sm font-semibold text-foreground">Recent Sessions</h3>
-                            <div className="space-y-1">
-                              {menteeData.sessions.slice(0, 5).map((s: any, i: number) => (
-                                <div key={i} className="flex items-center justify-between text-xs">
-                                  <span className="text-foreground">{s.topic}</span>
-                                  <span className="text-muted-foreground">{Math.round(s.duration_seconds / 60)}min • +{s.xp_earned}XP</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Confusions */}
-                        {menteeData.reports.some((r: any) => r.confusing_concepts) && (
-                          <div>
-                            <h3 className="mb-2 text-sm font-semibold text-foreground">Recent Confusions</h3>
-                            <div className="flex flex-wrap gap-1">
-                              {menteeData.reports
-                                .filter((r: any) => r.confusing_concepts)
-                                .flatMap((r: any) => r.confusing_concepts.split(/[,;\n]+/).map((c: string) => c.trim()))
-                                .filter(Boolean)
-                                .slice(0, 10)
-                                .map((c: string, i: number) => (
-                                  <span key={i} className="rounded-full bg-destructive/10 px-2 py-0.5 text-xs text-destructive">{c}</span>
-                                ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Goals */}
-                        {menteeData.goals.length > 0 && (
-                          <div>
-                            <h3 className="mb-2 text-sm font-semibold text-foreground">Goals</h3>
-                            {menteeData.goals.map((g: any, i: number) => {
-                              const concepts = Array.isArray(g.concepts) ? g.concepts : [];
-                              const done = concepts.filter((c: any) => c.status === 'completed').length;
-                              return (
-                                <div key={i} className="text-xs text-muted-foreground mb-1">
-                                  {g.is_active && <span className="text-primary mr-1">●</span>}
-                                  {g.description.substring(0, 50)} — {done}/{concepts.length} concepts
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-
-                        <Button variant="ghost" size="sm" onClick={() => removeLink.mutate(link.id)}
-                          className="text-destructive hover:text-destructive">
-                          Remove Mentee
-                        </Button>
-                      </div>
+                    {isExpanded && user && (
+                      <>
+                        <MenteeDetailPanel menteeId={link.mentee_id} mentorId={user.id} isMentor={true} />
+                        <div className="px-4 pb-4">
+                          <Button variant="ghost" size="sm" onClick={() => removeLink.mutate(link.id)}
+                            className="text-destructive hover:text-destructive">
+                            Remove Mentee
+                          </Button>
+                        </div>
+                      </>
                     )}
+
                   </div>
                 );
               })}
