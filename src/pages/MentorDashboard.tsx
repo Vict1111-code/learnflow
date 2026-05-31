@@ -10,6 +10,8 @@ import {
   Users, UserPlus, Check, X, Clock, Zap, Flame, Target, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import MenteeDetailPanel from '@/components/mentor/MenteeDetailPanel';
+
 
 interface MentorLink {
   id: string;
