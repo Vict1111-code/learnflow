@@ -259,6 +259,36 @@ export type Database = {
         }
         Relationships: []
       }
+      mentor_comments: {
+        Row: {
+          content: string
+          context_id: string | null
+          context_type: string | null
+          created_at: string
+          id: string
+          mentee_id: string
+          mentor_id: string
+        }
+        Insert: {
+          content: string
+          context_id?: string | null
+          context_type?: string | null
+          created_at?: string
+          id?: string
+          mentee_id: string
+          mentor_id: string
+        }
+        Update: {
+          content?: string
+          context_id?: string | null
+          context_type?: string | null
+          created_at?: string
+          id?: string
+          mentee_id?: string
+          mentor_id?: string
+        }
+        Relationships: []
+      }
       mentor_links: {
         Row: {
           created_at: string
@@ -280,6 +310,105 @@ export type Database = {
           mentee_id?: string
           mentor_id?: string
           status?: string
+        }
+        Relationships: []
+      }
+      mentor_resources: {
+        Row: {
+          created_at: string
+          id: string
+          mentee_id: string
+          mentor_id: string
+          note: string | null
+          title: string
+          url: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          mentee_id: string
+          mentor_id: string
+          note?: string | null
+          title: string
+          url?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          mentee_id?: string
+          mentor_id?: string
+          note?: string | null
+          title?: string
+          url?: string | null
+        }
+        Relationships: []
+      }
+      mentor_tasks: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          description: string | null
+          due_date: string | null
+          id: string
+          mentee_id: string
+          mentor_id: string
+          status: string
+          title: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          mentee_id: string
+          mentor_id: string
+          status?: string
+          title: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          mentee_id?: string
+          mentor_id?: string
+          status?: string
+          title?: string
+        }
+        Relationships: []
+      }
+      milestone_approvals: {
+        Row: {
+          approved_at: string
+          concept_id: string
+          concept_name: string | null
+          goal_id: string
+          id: string
+          mentee_id: string
+          mentor_id: string
+          note: string | null
+        }
+        Insert: {
+          approved_at?: string
+          concept_id: string
+          concept_name?: string | null
+          goal_id: string
+          id?: string
+          mentee_id: string
+          mentor_id: string
+          note?: string | null
+        }
+        Update: {
+          approved_at?: string
+          concept_id?: string
+          concept_name?: string | null
+          goal_id?: string
+          id?: string
+          mentee_id?: string
+          mentor_id?: string
+          note?: string | null
         }
         Relationships: []
       }
@@ -751,6 +880,26 @@ export type Database = {
           xp: number
         }[]
       }
+      get_mentee_timeline: {
+        Args: { _limit?: number; _mentee: string }
+        Returns: {
+          detail: string
+          event_time: string
+          event_type: string
+          ref_id: string
+          title: string
+        }[]
+      }
+      get_mentee_weekly_summary: {
+        Args: { _mentee: string }
+        Returns: {
+          day: string
+          focus_minutes: number
+          reflections: number
+          sessions: number
+          xp: number
+        }[]
+      }
       get_top_contributors: {
         Args: { _limit?: number }
         Returns: {
@@ -788,6 +937,11 @@ export type Database = {
       }
       is_group_owner: {
         Args: { _group_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_linked_with: { Args: { _a: string; _b: string }; Returns: boolean }
+      is_mentor_of: {
+        Args: { _mentee: string; _mentor: string }
         Returns: boolean
       }
       search_mentor_candidates: {
