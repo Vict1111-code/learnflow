@@ -180,31 +180,46 @@ export default function MentorDashboard() {
             <div className="space-y-2">
               {myMentors.map(link => {
                 const mentor = getProfile(link.mentor_id);
+                const isExpanded = expandedMentee === `mentor:${link.mentor_id}`;
+                const canExpand = link.status === 'active' && !!user;
                 return (
-                  <div key={link.id} className="flex items-center justify-between rounded-lg border border-border/50 bg-muted/20 px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-primary text-sm font-bold text-primary-foreground">
-                        {mentor?.name?.charAt(0).toUpperCase() || '?'}
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-foreground">{mentor?.name || 'Unknown'}</p>
-                        <p className="text-xs text-muted-foreground">{mentor?.level} • {mentor?.xp?.toLocaleString()} XP</p>
+                  <div key={link.id} className="rounded-lg border border-border/50 bg-muted/20 overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-3">
+                      <button
+                        onClick={() => canExpand && setExpandedMentee(isExpanded ? null : `mentor:${link.mentor_id}`)}
+                        disabled={!canExpand}
+                        className="flex flex-1 items-center gap-3 text-left"
+                      >
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-primary text-sm font-bold text-primary-foreground">
+                          {mentor?.name?.charAt(0).toUpperCase() || '?'}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-foreground">{mentor?.name || 'Unknown'}</p>
+                          <p className="text-xs text-muted-foreground">{mentor?.level} • {mentor?.xp?.toLocaleString()} XP</p>
+                        </div>
+                      </button>
+                      <div className="flex items-center gap-2">
+                        <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                          link.status === 'active' ? 'bg-xp/20 text-xp' :
+                          link.status === 'pending' ? 'bg-streak/20 text-streak' : 'bg-destructive/20 text-destructive'
+                        }`}>
+                          {link.status}
+                        </span>
+                        {canExpand && (isExpanded
+                          ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                          : <ChevronDown className="h-4 w-4 text-muted-foreground" />)}
+                        <Button variant="ghost" size="icon" onClick={() => removeLink.mutate(link.id)}>
+                          <X className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                        link.status === 'active' ? 'bg-xp/20 text-xp' :
-                        link.status === 'pending' ? 'bg-streak/20 text-streak' : 'bg-destructive/20 text-destructive'
-                      }`}>
-                        {link.status}
-                      </span>
-                      <Button variant="ghost" size="icon" onClick={() => removeLink.mutate(link.id)}>
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    {isExpanded && user && (
+                      <MenteeDetailPanel menteeId={user.id} mentorId={link.mentor_id} isMentor={false} />
+                    )}
                   </div>
                 );
               })}
+
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">No mentors yet. Search above to request one.</p>
