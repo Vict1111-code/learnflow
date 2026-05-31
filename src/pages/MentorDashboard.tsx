@@ -71,30 +71,8 @@ export default function MentorDashboard() {
     enabled: linkedUserIds.length > 0,
   });
 
-  // Fetch mentee study data for expanded mentee
-  const { data: menteeData } = useQuery({
-    queryKey: ['mentee-data', expandedMentee],
-    queryFn: async () => {
-      if (!expandedMentee) return null;
-      const [sessions, reports, focusRes, goalsRes] = await Promise.all([
-        supabase.from('study_sessions').select('duration_seconds, xp_earned, started_at, topic')
-          .eq('user_id', expandedMentee).not('ended_at', 'is', null)
-          .order('started_at', { ascending: false }).limit(10),
-        supabase.from('daily_reports').select('report_date, studied, confusing_concepts, xp_earned')
-          .eq('user_id', expandedMentee).order('report_date', { ascending: false }).limit(5),
-        supabase.rpc('calculate_focus_integrity', { p_user_id: expandedMentee }),
-        supabase.from('learning_goals').select('description, concepts, is_active')
-          .eq('user_id', expandedMentee),
-      ]);
-      return {
-        sessions: sessions.data || [],
-        reports: reports.data || [],
-        focus: focusRes.data as any,
-        goals: goalsRes.data || [],
-      };
-    },
-    enabled: !!expandedMentee,
-  });
+  // Mentee detail data is loaded inside MenteeDetailPanel
+
 
   // Request mentor by searching profile name
   const requestMentor = useMutation({
