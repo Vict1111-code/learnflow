@@ -10,6 +10,8 @@ import {
   Users, UserPlus, Check, X, Clock, Zap, Flame, Target, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import MenteeDetailPanel from '@/components/mentor/MenteeDetailPanel';
+
 
 interface MentorLink {
   id: string;
@@ -71,30 +73,8 @@ export default function MentorDashboard() {
     enabled: linkedUserIds.length > 0,
   });
 
-  // Fetch mentee study data for expanded mentee
-  const { data: menteeData } = useQuery({
-    queryKey: ['mentee-data', expandedMentee],
-    queryFn: async () => {
-      if (!expandedMentee) return null;
-      const [sessions, reports, focusRes, goalsRes] = await Promise.all([
-        supabase.from('study_sessions').select('duration_seconds, xp_earned, started_at, topic')
-          .eq('user_id', expandedMentee).not('ended_at', 'is', null)
-          .order('started_at', { ascending: false }).limit(10),
-        supabase.from('daily_reports').select('report_date, studied, confusing_concepts, xp_earned')
-          .eq('user_id', expandedMentee).order('report_date', { ascending: false }).limit(5),
-        supabase.rpc('calculate_focus_integrity', { p_user_id: expandedMentee }),
-        supabase.from('learning_goals').select('description, concepts, is_active')
-          .eq('user_id', expandedMentee),
-      ]);
-      return {
-        sessions: sessions.data || [],
-        reports: reports.data || [],
-        focus: focusRes.data as any,
-        goals: goalsRes.data || [],
-      };
-    },
-    enabled: !!expandedMentee,
-  });
+  // Mentee detail data is loaded inside MenteeDetailPanel
+
 
   // Request mentor by searching profile name
   const requestMentor = useMutation({
@@ -200,31 +180,46 @@ export default function MentorDashboard() {
             <div className="space-y-2">
               {myMentors.map(link => {
                 const mentor = getProfile(link.mentor_id);
+                const isExpanded = expandedMentee === `mentor:${link.mentor_id}`;
+                const canExpand = link.status === 'active' && !!user;
                 return (
-                  <div key={link.id} className="flex items-center justify-between rounded-lg border border-border/50 bg-muted/20 px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-primary text-sm font-bold text-primary-foreground">
-                        {mentor?.name?.charAt(0).toUpperCase() || '?'}
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-foreground">{mentor?.name || 'Unknown'}</p>
-                        <p className="text-xs text-muted-foreground">{mentor?.level} • {mentor?.xp?.toLocaleString()} XP</p>
+                  <div key={link.id} className="rounded-lg border border-border/50 bg-muted/20 overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-3">
+                      <button
+                        onClick={() => canExpand && setExpandedMentee(isExpanded ? null : `mentor:${link.mentor_id}`)}
+                        disabled={!canExpand}
+                        className="flex flex-1 items-center gap-3 text-left"
+                      >
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-primary text-sm font-bold text-primary-foreground">
+                          {mentor?.name?.charAt(0).toUpperCase() || '?'}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-foreground">{mentor?.name || 'Unknown'}</p>
+                          <p className="text-xs text-muted-foreground">{mentor?.level} • {mentor?.xp?.toLocaleString()} XP</p>
+                        </div>
+                      </button>
+                      <div className="flex items-center gap-2">
+                        <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                          link.status === 'active' ? 'bg-xp/20 text-xp' :
+                          link.status === 'pending' ? 'bg-streak/20 text-streak' : 'bg-destructive/20 text-destructive'
+                        }`}>
+                          {link.status}
+                        </span>
+                        {canExpand && (isExpanded
+                          ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                          : <ChevronDown className="h-4 w-4 text-muted-foreground" />)}
+                        <Button variant="ghost" size="icon" onClick={() => removeLink.mutate(link.id)}>
+                          <X className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                        link.status === 'active' ? 'bg-xp/20 text-xp' :
-                        link.status === 'pending' ? 'bg-streak/20 text-streak' : 'bg-destructive/20 text-destructive'
-                      }`}>
-                        {link.status}
-                      </span>
-                      <Button variant="ghost" size="icon" onClick={() => removeLink.mutate(link.id)}>
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    {isExpanded && user && (
+                      <MenteeDetailPanel menteeId={user.id} mentorId={link.mentor_id} isMentor={false} />
+                    )}
                   </div>
                 );
               })}
+
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">No mentors yet. Search above to request one.</p>
@@ -301,80 +296,18 @@ export default function MentorDashboard() {
                       {isExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
                     </button>
 
-                    {isExpanded && menteeData && (
-                      <div className="border-t border-border/50 px-4 py-4 space-y-4">
-                        {/* Focus Score */}
-                        {menteeData.focus && (
-                          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                            {[
-                              { label: 'Focus Score', value: Math.round(menteeData.focus.score || 0) },
-                              { label: 'Consistency', value: Math.round(menteeData.focus.consistency || 0) },
-                              { label: 'Completion', value: Math.round(menteeData.focus.completion || 0) },
-                              { label: 'Focus', value: Math.round(menteeData.focus.interruption || 0) },
-                            ].map(s => (
-                              <div key={s.label} className="rounded-lg bg-muted/30 p-3 text-center">
-                                <p className="font-display text-lg font-bold text-foreground">{s.value}</p>
-                                <p className="text-xs text-muted-foreground">{s.label}</p>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Recent Sessions */}
-                        {menteeData.sessions.length > 0 && (
-                          <div>
-                            <h3 className="mb-2 text-sm font-semibold text-foreground">Recent Sessions</h3>
-                            <div className="space-y-1">
-                              {menteeData.sessions.slice(0, 5).map((s: any, i: number) => (
-                                <div key={i} className="flex items-center justify-between text-xs">
-                                  <span className="text-foreground">{s.topic}</span>
-                                  <span className="text-muted-foreground">{Math.round(s.duration_seconds / 60)}min • +{s.xp_earned}XP</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Confusions */}
-                        {menteeData.reports.some((r: any) => r.confusing_concepts) && (
-                          <div>
-                            <h3 className="mb-2 text-sm font-semibold text-foreground">Recent Confusions</h3>
-                            <div className="flex flex-wrap gap-1">
-                              {menteeData.reports
-                                .filter((r: any) => r.confusing_concepts)
-                                .flatMap((r: any) => r.confusing_concepts.split(/[,;\n]+/).map((c: string) => c.trim()))
-                                .filter(Boolean)
-                                .slice(0, 10)
-                                .map((c: string, i: number) => (
-                                  <span key={i} className="rounded-full bg-destructive/10 px-2 py-0.5 text-xs text-destructive">{c}</span>
-                                ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Goals */}
-                        {menteeData.goals.length > 0 && (
-                          <div>
-                            <h3 className="mb-2 text-sm font-semibold text-foreground">Goals</h3>
-                            {menteeData.goals.map((g: any, i: number) => {
-                              const concepts = Array.isArray(g.concepts) ? g.concepts : [];
-                              const done = concepts.filter((c: any) => c.status === 'completed').length;
-                              return (
-                                <div key={i} className="text-xs text-muted-foreground mb-1">
-                                  {g.is_active && <span className="text-primary mr-1">●</span>}
-                                  {g.description.substring(0, 50)} — {done}/{concepts.length} concepts
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-
-                        <Button variant="ghost" size="sm" onClick={() => removeLink.mutate(link.id)}
-                          className="text-destructive hover:text-destructive">
-                          Remove Mentee
-                        </Button>
-                      </div>
+                    {isExpanded && user && (
+                      <>
+                        <MenteeDetailPanel menteeId={link.mentee_id} mentorId={user.id} isMentor={true} />
+                        <div className="px-4 pb-4">
+                          <Button variant="ghost" size="sm" onClick={() => removeLink.mutate(link.id)}
+                            className="text-destructive hover:text-destructive">
+                            Remove Mentee
+                          </Button>
+                        </div>
+                      </>
                     )}
+
                   </div>
                 );
               })}
