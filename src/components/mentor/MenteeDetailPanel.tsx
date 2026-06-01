@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,56 @@ interface Props {
 export default function MenteeDetailPanel({ menteeId, mentorId, isMentor }: Props) {
   const qc = useQueryClient();
   const [tab, setTab] = useState('overview');
+
+  // Realtime subscriptions: live updates + toast notifications for both sides
+  useEffect(() => {
+    const sideLabel = isMentor ? 'Mentee' : 'Mentor';
+    const matchesPair = (row: any) =>
+      row && row.mentor_id === mentorId && row.mentee_id === menteeId;
+
+    const handle = (
+      table: 'mentor_comments' | 'mentor_tasks' | 'mentor_resources' | 'milestone_approvals',
+      queryKey: any[],
+      messages: { insert: string; update?: string; delete?: string },
+    ) => (payload: any) => {
+      const row = payload.new ?? payload.old;
+      if (!matchesPair(row)) return;
+      // Skip self-originated INSERTs to avoid double-toasting the actor
+      const actorIsMe = isMentor ? row.mentor_id === mentorId : row.mentee_id === menteeId;
+      qc.invalidateQueries({ queryKey });
+      if (payload.eventType === 'INSERT' && !(actorIsMe && isMentor && table !== 'mentor_tasks')) {
+        // For mentor-only writes (comments/resources/approvals) the mentor already saw a toast
+        if (isMentor && table !== 'mentor_tasks') return;
+        toast(`${sideLabel}: ${messages.insert}`);
+      } else if (payload.eventType === 'UPDATE' && messages.update) {
+        toast(`${sideLabel}: ${messages.update}`);
+      } else if (payload.eventType === 'DELETE' && messages.delete) {
+        toast(`${sideLabel}: ${messages.delete}`);
+      }
+    };
+
+    const channel = supabase
+      .channel(`mentor-panel-${mentorId}-${menteeId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'mentor_comments' },
+        handle('mentor_comments', ['mentor-comments', menteeId, mentorId], {
+          insert: 'New comment posted', delete: 'Comment removed',
+        }))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'mentor_tasks' },
+        handle('mentor_tasks', ['mentor-tasks', menteeId, mentorId], {
+          insert: 'New task assigned', update: 'Task status updated', delete: 'Task removed',
+        }))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'mentor_resources' },
+        handle('mentor_resources', ['mentor-resources', menteeId, mentorId], {
+          insert: 'New resource recommended', delete: 'Resource removed',
+        }))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'milestone_approvals' },
+        handle('milestone_approvals', ['mentor-approvals', menteeId, mentorId], {
+          insert: 'Milestone approved', delete: 'Milestone approval revoked',
+        }))
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [menteeId, mentorId, isMentor, qc]);
 
   // Core mentee data
   const { data: menteeData } = useQuery({
