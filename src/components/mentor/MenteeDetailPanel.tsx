@@ -151,6 +151,21 @@ export default function MenteeDetailPanel({ menteeId, mentorId, isMentor }: Prop
     },
   });
 
+  // Mentor activity events (notifications feed per pair)
+  const { data: activity } = useQuery({
+    queryKey: ['mentor-activity', menteeId, mentorId],
+    queryFn: async () => {
+      const { data } = await (supabase.from as any)('mentor_activity_events').select('*')
+        .eq('mentor_id', mentorId).eq('mentee_id', menteeId)
+        .order('created_at', { ascending: false }).limit(60);
+      return (data || []) as any[];
+    },
+  });
+
+  // Task filter + sort UI state
+  const [taskFilter, setTaskFilter] = useState<'all' | 'open' | 'done' | 'due_soon' | 'overdue'>('all');
+  const [taskSort, setTaskSort] = useState<'created_desc' | 'due_asc' | 'status'>('created_desc');
+
   // Mutations
   const [commentText, setCommentText] = useState('');
   const addComment = useMutation({
