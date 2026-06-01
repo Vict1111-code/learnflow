@@ -379,7 +379,39 @@ export default function MenteeDetailPanel({ menteeId, mentorId, isMentor }: Prop
           </div>
         </TabsContent>
 
-        {/* COMMENTS */}
+        {/* ACTIVITY */}
+        <TabsContent value="activity" className="pt-4">
+          <div className="space-y-2 max-h-96 overflow-y-auto pr-2">
+            {(activity || []).length === 0 ? (
+              <p className="text-sm text-muted-foreground">No mentor activity yet.</p>
+            ) : (activity || []).map((a: any) => {
+              const icon =
+                a.entity_type === 'comment' ? MessageSquare :
+                a.entity_type === 'task' ? ListChecks :
+                a.entity_type === 'resource' ? Link2 : Award;
+              const Icon = icon;
+              const actorLabel = a.actor_id === mentorId ? 'Mentor' : 'Mentee';
+              return (
+                <div key={a.id} className="flex gap-3 rounded-lg border border-border/50 bg-muted/20 p-3">
+                  <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+                    <Icon className="h-3 w-3" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-medium text-foreground truncate">{a.title}</p>
+                      <span className="text-[10px] uppercase text-muted-foreground shrink-0">{actorLabel} · {a.action}</span>
+                    </div>
+                    {a.detail && <p className="text-xs text-muted-foreground">{a.detail}</p>}
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      {new Date(a.created_at).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </TabsContent>
+
         <TabsContent value="feedback" className="space-y-3 pt-4">
           {isMentor && (
             <div className="space-y-2">
