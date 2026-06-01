@@ -259,6 +259,51 @@ export type Database = {
         }
         Relationships: []
       }
+      mentor_activity_events: {
+        Row: {
+          action: string
+          actor_id: string
+          created_at: string
+          detail: string | null
+          entity_id: string | null
+          entity_type: string
+          id: string
+          mentee_id: string
+          mentee_read_at: string | null
+          mentor_id: string
+          mentor_read_at: string | null
+          title: string
+        }
+        Insert: {
+          action: string
+          actor_id: string
+          created_at?: string
+          detail?: string | null
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          mentee_id: string
+          mentee_read_at?: string | null
+          mentor_id: string
+          mentor_read_at?: string | null
+          title: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string
+          created_at?: string
+          detail?: string | null
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          mentee_id?: string
+          mentee_read_at?: string | null
+          mentor_id?: string
+          mentor_read_at?: string | null
+          title?: string
+        }
+        Relationships: []
+      }
       mentor_comments: {
         Row: {
           content: string
@@ -944,6 +989,7 @@ export type Database = {
         Args: { _mentee: string; _mentor: string }
         Returns: boolean
       }
+      mark_mentor_activity_read: { Args: never; Returns: number }
       search_mentor_candidates: {
         Args: { query: string }
         Returns: {

@@ -5,9 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Zap, Flame, Target, MessageSquare, ListChecks, Link2, CheckCircle2,
-  Trash2, Plus, Activity, Calendar, BookOpen, Award,
+  Trash2, Plus, Activity, Calendar, BookOpen, Award, Bell, AlertCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
@@ -150,6 +151,21 @@ export default function MenteeDetailPanel({ menteeId, mentorId, isMentor }: Prop
     },
   });
 
+  // Mentor activity events (notifications feed per pair)
+  const { data: activity } = useQuery({
+    queryKey: ['mentor-activity', menteeId, mentorId],
+    queryFn: async () => {
+      const { data } = await (supabase.from as any)('mentor_activity_events').select('*')
+        .eq('mentor_id', mentorId).eq('mentee_id', menteeId)
+        .order('created_at', { ascending: false }).limit(60);
+      return (data || []) as any[];
+    },
+  });
+
+  // Task filter + sort UI state
+  const [taskFilter, setTaskFilter] = useState<'all' | 'open' | 'done' | 'due_soon' | 'overdue'>('all');
+  const [taskSort, setTaskSort] = useState<'created_desc' | 'due_asc' | 'status'>('created_desc');
+
   // Mutations
   const [commentText, setCommentText] = useState('');
   const addComment = useMutation({
@@ -255,9 +271,10 @@ export default function MenteeDetailPanel({ menteeId, mentorId, isMentor }: Prop
   return (
     <div className="border-t border-border/50 px-4 py-4">
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="overview"><Activity className="mr-1 h-3.5 w-3.5" />Overview</TabsTrigger>
           <TabsTrigger value="timeline"><Calendar className="mr-1 h-3.5 w-3.5" />Timeline</TabsTrigger>
+          <TabsTrigger value="activity"><Bell className="mr-1 h-3.5 w-3.5" />Activity</TabsTrigger>
           <TabsTrigger value="feedback"><MessageSquare className="mr-1 h-3.5 w-3.5" />Comments</TabsTrigger>
           <TabsTrigger value="tasks"><ListChecks className="mr-1 h-3.5 w-3.5" />Tasks</TabsTrigger>
           <TabsTrigger value="milestones"><Award className="mr-1 h-3.5 w-3.5" />Milestones</TabsTrigger>
@@ -362,7 +379,39 @@ export default function MenteeDetailPanel({ menteeId, mentorId, isMentor }: Prop
           </div>
         </TabsContent>
 
-        {/* COMMENTS */}
+        {/* ACTIVITY */}
+        <TabsContent value="activity" className="pt-4">
+          <div className="space-y-2 max-h-96 overflow-y-auto pr-2">
+            {(activity || []).length === 0 ? (
+              <p className="text-sm text-muted-foreground">No mentor activity yet.</p>
+            ) : (activity || []).map((a: any) => {
+              const icon =
+                a.entity_type === 'comment' ? MessageSquare :
+                a.entity_type === 'task' ? ListChecks :
+                a.entity_type === 'resource' ? Link2 : Award;
+              const Icon = icon;
+              const actorLabel = a.actor_id === mentorId ? 'Mentor' : 'Mentee';
+              return (
+                <div key={a.id} className="flex gap-3 rounded-lg border border-border/50 bg-muted/20 p-3">
+                  <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+                    <Icon className="h-3 w-3" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-medium text-foreground truncate">{a.title}</p>
+                      <span className="text-[10px] uppercase text-muted-foreground shrink-0">{actorLabel} · {a.action}</span>
+                    </div>
+                    {a.detail && <p className="text-xs text-muted-foreground">{a.detail}</p>}
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      {new Date(a.created_at).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </TabsContent>
+
         <TabsContent value="feedback" className="space-y-3 pt-4">
           {isMentor && (
             <div className="space-y-2">
@@ -444,27 +493,113 @@ export default function MenteeDetailPanel({ menteeId, mentorId, isMentor }: Prop
                 disabled={!taskTitle.trim() || addTask.isPending}>Assign</Button>
             </div>
           )}
+
+          {/* Filter + sort */}
+          {(tasks || []).length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <Select value={taskFilter} onValueChange={(v) => setTaskFilter(v as any)}>
+                <SelectTrigger className="h-8 w-36 text-xs"><SelectValue placeholder="Filter" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All tasks</SelectItem>
+                  <SelectItem value="open">Open</SelectItem>
+                  <SelectItem value="done">Completed</SelectItem>
+                  <SelectItem value="due_soon">Due soon (7d)</SelectItem>
+                  <SelectItem value="overdue">Overdue</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={taskSort} onValueChange={(v) => setTaskSort(v as any)}>
+                <SelectTrigger className="h-8 w-40 text-xs"><SelectValue placeholder="Sort" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="created_desc">Newest first</SelectItem>
+                  <SelectItem value="due_asc">Earliest due</SelectItem>
+                  <SelectItem value="status">By status</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <div className="space-y-2">
-            {(tasks || []).length === 0 ? (
-              <p className="text-sm text-muted-foreground">No tasks yet.</p>
-            ) : (tasks || []).map((t: any) => (
-              <div key={t.id} className="flex items-center justify-between rounded-lg border border-border/50 bg-muted/20 p-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <button onClick={() => toggleTask.mutate({ id: t.id, status: t.status === 'done' ? 'open' : 'done' })}>
-                    <CheckCircle2 className={`h-5 w-5 ${t.status === 'done' ? 'text-xp fill-xp/20' : 'text-muted-foreground'}`} />
-                  </button>
-                  <div className="min-w-0">
-                    <p className={`text-sm font-medium ${t.status === 'done' ? 'line-through text-muted-foreground' : 'text-foreground'}`}>{t.title}</p>
-                    {t.due_date && <p className="text-[10px] text-muted-foreground">Due {new Date(t.due_date).toLocaleDateString()}</p>}
+            {(() => {
+              const now = Date.now();
+              const weekMs = 7 * 24 * 60 * 60 * 1000;
+              let list = [...(tasks || [])];
+              list = list.filter((t: any) => {
+                if (taskFilter === 'all') return true;
+                if (taskFilter === 'open') return t.status !== 'done';
+                if (taskFilter === 'done') return t.status === 'done';
+                if (!t.due_date || t.status === 'done') return false;
+                const due = new Date(t.due_date).getTime();
+                if (taskFilter === 'overdue') return due < now;
+                if (taskFilter === 'due_soon') return due >= now && due - now <= weekMs;
+                return true;
+              });
+              list.sort((a: any, b: any) => {
+                if (taskSort === 'due_asc') {
+                  const ad = a.due_date ? new Date(a.due_date).getTime() : Infinity;
+                  const bd = b.due_date ? new Date(b.due_date).getTime() : Infinity;
+                  return ad - bd;
+                }
+                if (taskSort === 'status') {
+                  const rank = (s: string) => (s === 'done' ? 2 : s === 'in_progress' ? 1 : 0);
+                  return rank(a.status) - rank(b.status);
+                }
+                return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+              });
+
+              if (list.length === 0) {
+                return <p className="text-sm text-muted-foreground">No tasks match this filter.</p>;
+              }
+              return list.map((t: any) => {
+                const due = t.due_date ? new Date(t.due_date).getTime() : null;
+                const isOverdue = due !== null && due < now && t.status !== 'done';
+                const isDueSoon = due !== null && !isOverdue && due - now <= weekMs && t.status !== 'done';
+                return (
+                  <div key={t.id} className={`flex items-center justify-between rounded-lg border p-3 ${
+                    isOverdue ? 'border-destructive/50 bg-destructive/5' :
+                    isDueSoon ? 'border-streak/40 bg-streak/5' :
+                    'border-border/50 bg-muted/20'
+                  }`}>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <button onClick={() => toggleTask.mutate({ id: t.id, status: t.status === 'done' ? 'open' : 'done' })}>
+                        <CheckCircle2 className={`h-5 w-5 ${t.status === 'done' ? 'text-xp fill-xp/20' : 'text-muted-foreground'}`} />
+                      </button>
+                      <div className="min-w-0">
+                        <p className={`text-sm font-medium ${t.status === 'done' ? 'line-through text-muted-foreground' : 'text-foreground'}`}>{t.title}</p>
+                        <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                          {t.due_date && <span>Due {new Date(t.due_date).toLocaleDateString()}</span>}
+                          {isOverdue && <span className="flex items-center gap-0.5 text-destructive font-medium"><AlertCircle className="h-2.5 w-2.5" /> Overdue</span>}
+                          {isDueSoon && <span className="text-streak font-medium">Due soon</span>}
+                          <span className="uppercase">· {t.status}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {!isMentor && t.status !== 'done' && (
+                        <Button size="sm" variant="ghost" className="h-7 text-xs"
+                          onClick={() => toggleTask.mutate({ id: t.id, status: 'done' })}>
+                          Mark done
+                        </Button>
+                      )}
+                      {isMentor && (
+                        <Select value={t.status} onValueChange={(v) => toggleTask.mutate({ id: t.id, status: v })}>
+                          <SelectTrigger className="h-7 w-28 text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="open">Open</SelectItem>
+                            <SelectItem value="in_progress">In progress</SelectItem>
+                            <SelectItem value="done">Done</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
+                      {isMentor && (
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => delTask.mutate(t.id)}>
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                </div>
-                {isMentor && (
-                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => delTask.mutate(t.id)}>
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                )}
-              </div>
-            ))}
+                );
+              });
+            })()}
           </div>
         </TabsContent>
 

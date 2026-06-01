@@ -4,6 +4,7 @@ import { Menu } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useAuth } from '@/contexts/AuthContext';
 import AppSidebar from './AppSidebar';
+import NotificationInbox from './NotificationInbox';
 import logo from '@/assets/learnflow-logo.png';
 
 export default function MobileTopBar() {
@@ -17,17 +18,20 @@ export default function MobileTopBar() {
         <img src={logo} alt="learnflow" className="h-8 w-8 object-contain" />
         <span className="font-display text-lg font-bold">learnflow</span>
       </Link>
-      <Sheet open={open} onOpenChange={setOpen}>
-        <SheetTrigger
-          aria-label="Open menu"
-          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border/60 bg-muted/40 text-foreground transition-colors hover:bg-accent"
-        >
-          <Menu className="h-5 w-5" />
-        </SheetTrigger>
-        <SheetContent side="left" className="w-72 border-sidebar-border bg-sidebar p-0">
-          <AppSidebar variant="inline" onNavigate={() => setOpen(false)} />
-        </SheetContent>
-      </Sheet>
+      <div className="flex items-center gap-1">
+        {user && <NotificationInbox />}
+        <Sheet open={open} onOpenChange={setOpen}>
+          <SheetTrigger
+            aria-label="Open menu"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border/60 bg-muted/40 text-foreground transition-colors hover:bg-accent"
+          >
+            <Menu className="h-5 w-5" />
+          </SheetTrigger>
+          <SheetContent side="left" className="w-72 border-sidebar-border bg-sidebar p-0">
+            <AppSidebar variant="inline" onNavigate={() => setOpen(false)} />
+          </SheetContent>
+        </Sheet>
+      </div>
     </header>
   );
 }
