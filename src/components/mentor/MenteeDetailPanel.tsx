@@ -271,9 +271,10 @@ export default function MenteeDetailPanel({ menteeId, mentorId, isMentor }: Prop
   return (
     <div className="border-t border-border/50 px-4 py-4">
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="overview"><Activity className="mr-1 h-3.5 w-3.5" />Overview</TabsTrigger>
           <TabsTrigger value="timeline"><Calendar className="mr-1 h-3.5 w-3.5" />Timeline</TabsTrigger>
+          <TabsTrigger value="activity"><Bell className="mr-1 h-3.5 w-3.5" />Activity</TabsTrigger>
           <TabsTrigger value="feedback"><MessageSquare className="mr-1 h-3.5 w-3.5" />Comments</TabsTrigger>
           <TabsTrigger value="tasks"><ListChecks className="mr-1 h-3.5 w-3.5" />Tasks</TabsTrigger>
           <TabsTrigger value="milestones"><Award className="mr-1 h-3.5 w-3.5" />Milestones</TabsTrigger>
