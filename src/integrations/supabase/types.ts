@@ -917,7 +917,19 @@ export type Database = {
       get_leaderboard: {
         Args: never
         Returns: {
+          avatar_url: string
           id: string
+          level: string
+          name: string
+          streak: number
+          user_id: string
+          xp: number
+        }[]
+      }
+      get_linked_profiles: {
+        Args: never
+        Returns: {
+          avatar_url: string
           level: string
           name: string
           streak: number

@@ -3,10 +3,11 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   Brain, Timer, BarChart3, Users, Layers, FileQuestion, MessagesSquare, Route,
-  Sparkles, Play, ArrowRight, Check, Flame, Zap, Clock, Target, TrendingUp,
+  Play, ArrowRight, Check, Flame, Zap, Clock, Target, TrendingUp,
   BookOpen, GraduationCap, LineChart, Star, Quote, ChevronRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import learnflowLogo from '@/assets/learnflow-logo.png';
 
 const fadeUp = {
   initial: { opacity: 0, y: 24 },
@@ -83,9 +84,7 @@ export default function Landing() {
       <header className="sticky top-0 z-50 border-b border-border/40 bg-background/60 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
           <Link to="/" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-primary shadow-glow-primary">
-              <Sparkles className="h-4 w-4 text-primary-foreground" />
-            </div>
+            <img src={learnflowLogo} alt="LearnFlow logo" className="h-8 w-8 object-contain" />
             <span className="font-display text-lg font-bold tracking-tight">LearnFlow</span>
           </Link>
           <nav className="hidden items-center gap-8 md:flex">
@@ -547,9 +546,7 @@ export default function Landing() {
       <footer className="border-t border-border/40 px-6 py-10">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 text-sm text-muted-foreground md:flex-row">
           <div className="flex items-center gap-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-gradient-primary">
-              <Sparkles className="h-3 w-3 text-primary-foreground" />
-            </div>
+            <img src={learnflowLogo} alt="" className="h-6 w-6 object-contain" />
             <span className="font-display font-semibold text-foreground">LearnFlow</span>
             <span>© {new Date().getFullYear()}</span>
           </div>
