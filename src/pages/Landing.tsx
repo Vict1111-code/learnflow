@@ -546,9 +546,7 @@ export default function Landing() {
       <footer className="border-t border-border/40 px-6 py-10">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 text-sm text-muted-foreground md:flex-row">
           <div className="flex items-center gap-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-gradient-primary">
-              <Sparkles className="h-3 w-3 text-primary-foreground" />
-            </div>
+            <img src={learnflowLogo} alt="" className="h-6 w-6 object-contain" />
             <span className="font-display font-semibold text-foreground">LearnFlow</span>
             <span>© {new Date().getFullYear()}</span>
           </div>
