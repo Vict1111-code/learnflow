@@ -57,20 +57,16 @@ export default function MentorDashboard() {
     enabled: !!user,
   });
 
-  // Fetch profiles for linked users
-  const linkedUserIds = [
-    ...(menteeLinks?.map(l => l.mentee_id) || []),
-    ...(mentorLinks?.map(l => l.mentor_id) || []),
-  ].filter(Boolean);
-
+  // Fetch profiles for linked users via security-definer RPC (RLS-safe)
   const { data: linkedProfiles } = useQuery({
-    queryKey: ['mentor-profiles', linkedUserIds],
+    queryKey: ['mentor-linked-profiles', user?.id],
     queryFn: async () => {
-      if (linkedUserIds.length === 0) return [];
-      const { data } = await supabase.from('profiles').select('*').in('user_id', linkedUserIds);
+      if (!user) return [];
+      const { data, error } = await supabase.rpc('get_linked_profiles');
+      if (error) throw error;
       return data || [];
     },
-    enabled: linkedUserIds.length > 0,
+    enabled: !!user,
   });
 
   // Mentee detail data is loaded inside MenteeDetailPanel

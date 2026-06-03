@@ -3,10 +3,11 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   Brain, Timer, BarChart3, Users, Layers, FileQuestion, MessagesSquare, Route,
-  Sparkles, Play, ArrowRight, Check, Flame, Zap, Clock, Target, TrendingUp,
+  Play, ArrowRight, Check, Flame, Zap, Clock, Target, TrendingUp,
   BookOpen, GraduationCap, LineChart, Star, Quote, ChevronRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import learnflowLogo from '@/assets/learnflow-logo.png';
 
 const fadeUp = {
   initial: { opacity: 0, y: 24 },
@@ -83,9 +84,7 @@ export default function Landing() {
       <header className="sticky top-0 z-50 border-b border-border/40 bg-background/60 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
           <Link to="/" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-primary shadow-glow-primary">
-              <Sparkles className="h-4 w-4 text-primary-foreground" />
-            </div>
+            <img src={learnflowLogo} alt="LearnFlow logo" className="h-8 w-8 object-contain" />
             <span className="font-display text-lg font-bold tracking-tight">LearnFlow</span>
           </Link>
           <nav className="hidden items-center gap-8 md:flex">
