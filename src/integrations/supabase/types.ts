@@ -53,6 +53,126 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_flashcards: {
+        Row: {
+          back: string
+          created_at: string
+          deck_name: string
+          difficulty: string | null
+          front: string
+          id: string
+          last_reviewed_at: string | null
+          review_count: number
+          source: string | null
+          source_id: string | null
+          topic: string | null
+          user_id: string
+        }
+        Insert: {
+          back: string
+          created_at?: string
+          deck_name?: string
+          difficulty?: string | null
+          front: string
+          id?: string
+          last_reviewed_at?: string | null
+          review_count?: number
+          source?: string | null
+          source_id?: string | null
+          topic?: string | null
+          user_id: string
+        }
+        Update: {
+          back?: string
+          created_at?: string
+          deck_name?: string
+          difficulty?: string | null
+          front?: string
+          id?: string
+          last_reviewed_at?: string | null
+          review_count?: number
+          source?: string | null
+          source_id?: string | null
+          topic?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ai_interactions: {
+        Row: {
+          created_at: string
+          goal_id: string | null
+          id: string
+          input: Json
+          kind: string
+          output: Json
+          topic: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          goal_id?: string | null
+          id?: string
+          input?: Json
+          kind: string
+          output?: Json
+          topic?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          goal_id?: string | null
+          id?: string
+          input?: Json
+          kind?: string
+          output?: Json
+          topic?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ai_quizzes: {
+        Row: {
+          answers: Json | null
+          completed_at: string | null
+          created_at: string
+          difficulty: string
+          id: string
+          question_types: string[]
+          questions: Json
+          score: number | null
+          topic: string
+          total_questions: number
+          user_id: string
+        }
+        Insert: {
+          answers?: Json | null
+          completed_at?: string | null
+          created_at?: string
+          difficulty?: string
+          id?: string
+          question_types?: string[]
+          questions?: Json
+          score?: number | null
+          topic: string
+          total_questions?: number
+          user_id: string
+        }
+        Update: {
+          answers?: Json | null
+          completed_at?: string | null
+          created_at?: string
+          difficulty?: string
+          id?: string
+          question_types?: string[]
+          questions?: Json
+          score?: number | null
+          topic?: string
+          total_questions?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       community_posts: {
         Row: {
           content: string

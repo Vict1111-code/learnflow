@@ -1,7 +1,7 @@
 import { NavLink, useLocation, Link } from 'react-router-dom';
 import {
   LayoutDashboard, Timer, FileText, Users, Trophy,
-  User, BookOpen, Zap, Flame, LogOut, BarChart3, Award, GraduationCap, Brain
+  User, BookOpen, Zap, Flame, LogOut, BarChart3, Award, GraduationCap, Brain, Sparkles
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
@@ -13,6 +13,7 @@ export const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/study', icon: Timer, label: 'Study Timer' },
   { to: '/memory', icon: Brain, label: 'Learning Memory' },
+  { to: '/assistant', icon: Sparkles, label: 'AI Assistant' },
   { to: '/plan', icon: BookOpen, label: 'Study Plan' },
   { to: '/report', icon: FileText, label: 'Daily Report' },
   { to: '/analytics', icon: BarChart3, label: 'Analytics' },
