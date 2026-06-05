@@ -24,11 +24,7 @@ export default function ChatWorkspace({ compact }: { compact?: boolean }) {
         <MessageList />
       ) : (
         <div className="flex-1 min-h-0 overflow-y-auto">
-          <EmptyState onPick={(t) => {
-            // place prompt in composer by focusing textarea later
-            const ta = document.querySelector<HTMLTextAreaElement>('textarea[placeholder]');
-            if (ta) { ta.value = t; ta.focus(); ta.dispatchEvent(new Event('input', { bubbles: true })); }
-          }} />
+          <EmptyState />
         </div>
       )}
 

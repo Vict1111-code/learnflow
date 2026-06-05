@@ -3,7 +3,7 @@ import { useLearningContext } from '@/hooks/useLearningContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import QuickActions from './QuickActions';
 
-export default function EmptyState({ onPick }: { onPick: (text: string) => void }) {
+export default function EmptyState() {
   const { data: ctx, isLoading } = useLearningContext();
 
   const stats = [
@@ -40,7 +40,7 @@ export default function EmptyState({ onPick }: { onPick: (text: string) => void 
 
       <div>
         <div className="mb-2 px-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Quick actions</div>
-        <QuickActions onPick={onPick} />
+        <QuickActions />
       </div>
     </div>
   );
