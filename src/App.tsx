@@ -26,7 +26,10 @@ import Portfolio from "./pages/Portfolio";
 import MentorDashboard from "./pages/MentorDashboard";
 import Memory from "./pages/Memory";
 import AIAssistant from "./pages/AIAssistant";
+import AIWorkspace from "./pages/AIWorkspace";
 import NotFound from "./pages/NotFound";
+import { SidebarProvider } from "./contexts/SidebarContext";
+import { AIAssistantProvider } from "./contexts/AIAssistantContext";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -51,13 +54,16 @@ const protectedRoutes: Array<{ path: string; element: JSX.Element }> = [
   { path: "/portfolio", element: <Portfolio /> },
   { path: "/mentor", element: <MentorDashboard /> },
   { path: "/memory", element: <Memory /> },
+  { path: "/ai", element: <AIWorkspace /> },
   { path: "/assistant", element: <AIAssistant /> },
 ];
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
-      <TooltipProvider>
+      <SidebarProvider>
+        <AIAssistantProvider>
+          <TooltipProvider>
         <Toaster />
         <Sonner />
         <BrowserRouter>
