@@ -145,30 +145,31 @@ export function AIAssistantProvider({ children }: { children: ReactNode }) {
 
   const sendMessage = useCallback(async (text: string, attachments?: AIAttachment[]) => {
     let chatId = activeChatId;
-    if (!chatId) chatId = newChat();
+    let baseChat: AIChat | undefined = chats.find(c => c.id === chatId);
+    if (!chatId || !baseChat) {
+      chatId = uid();
+      baseChat = { id: chatId, title: 'New chat', mode, pinned: false, favorite: false, messages: [], createdAt: Date.now(), updatedAt: Date.now() };
+      setChats(prev => [baseChat!, ...prev]);
+      setActiveChatId(chatId);
+    }
     const userMsg: AIMessage = { id: uid(), role: 'user', content: text, createdAt: Date.now(), attachments, mode };
-
-    setChats(prev => prev.map(c => c.id === chatId ? {
-      ...c,
-      title: c.messages.length === 0 ? text.slice(0, 48) : c.title,
+    const nextMessages = [...baseChat.messages, userMsg];
+    const updated: AIChat = {
+      ...baseChat,
       mode,
-      messages: [...c.messages, userMsg],
+      title: baseChat.messages.length === 0 ? text.slice(0, 48) : baseChat.title,
+      messages: nextMessages,
       updatedAt: Date.now(),
-    } : c));
+    };
+
+    setChats(prev => {
+      const exists = prev.some(c => c.id === chatId);
+      return exists ? prev.map(c => c.id === chatId ? updated : c) : [updated, ...prev];
+    });
 
     setIsSending(true);
     try {
-      const current = (loadChats().find(c => c.id === chatId)) ?? null;
-      // Use latest state directly via callback approach
-      let workingChat: AIChat | null = null;
-      setChats(prev => {
-        workingChat = prev.find(c => c.id === chatId) ?? null;
-        return prev;
-      });
-      if (!workingChat) workingChat = current;
-      if (!workingChat) throw new Error('Chat not found');
-
-      const reply = await callBackend(workingChat);
+      const reply = await callBackend(updated);
       const aiMsg: AIMessage = { id: uid(), role: 'assistant', content: reply || '…', createdAt: Date.now(), mode };
       setChats(prev => prev.map(c => c.id === chatId ? { ...c, messages: [...c.messages, aiMsg], updatedAt: Date.now() } : c));
     } catch (e: any) {
@@ -178,7 +179,7 @@ export function AIAssistantProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsSending(false);
     }
-  }, [activeChatId, mode, newChat, callBackend]);
+  }, [activeChatId, chats, mode, callBackend]);
 
   const regenerate = useCallback(async () => {
     const chat = chats.find(c => c.id === activeChatId);
