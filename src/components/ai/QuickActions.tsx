@@ -1,0 +1,44 @@
+import { BookOpen, ListChecks, Layers, NotebookPen, Map, Link2, LucideIcon } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { useAIAssistant } from '@/contexts/AIAssistantContext';
+import { AIModeId } from '@/lib/ai-modes';
+
+interface Action { id: AIModeId; label: string; sample: string; icon: LucideIcon; }
+const ACTIONS: Action[] = [
+  { id: 'explain',    label: 'Explain a concept',  sample: 'Explain recursion at a beginner level with a simple example.',         icon: BookOpen },
+  { id: 'quiz',       label: 'Generate a quiz',    sample: 'Generate a 5-question quiz on JavaScript closures, medium difficulty.', icon: ListChecks },
+  { id: 'flashcards', label: 'Create flashcards',  sample: 'Create 10 flashcards covering core React hooks (useState, useEffect, useMemo, useCallback, useRef, useContext).', icon: Layers },
+  { id: 'review',     label: 'Analyze session',    sample: 'Review my latest study session: what should I revise and what should I tackle next?', icon: NotebookPen },
+  { id: 'roadmap',    label: 'Build a roadmap',    sample: 'Build a 6-week roadmap to become comfortable with backend engineering basics.', icon: Map },
+  { id: 'resources',  label: 'Find resources',     sample: 'Find free high-quality resources to learn TypeScript fundamentals.',  icon: Link2 },
+];
+
+export default function QuickActions() {
+  const { setMode, sendMessage } = useAIAssistant();
+  return (
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+      {ACTIONS.map((a, i) => {
+        const Icon = a.icon;
+        return (
+          <motion.button
+            key={a.id}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.04 }}
+            whileHover={{ y: -2 }}
+            onClick={() => { setMode(a.id); sendMessage(a.sample); }}
+            className="group relative overflow-hidden rounded-xl border border-border/60 bg-card/50 p-3 text-left backdrop-blur-xl transition-all hover:border-primary/40 hover:shadow-glow-primary"
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-[hsl(var(--level-purple))]/5 opacity-0 transition-opacity group-hover:opacity-100" />
+            <div className="relative flex items-start gap-2.5">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <Icon className="h-4 w-4" />
+              </div>
+              <div className="text-xs font-medium text-foreground">{a.label}</div>
+            </div>
+          </motion.button>
+        );
+      })}
+    </div>
+  );
+}

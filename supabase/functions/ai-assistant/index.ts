@@ -13,6 +13,7 @@ const SYSTEM_PROMPTS: Record<string, string> = {
   quiz: `You are LearnFlow's quiz generator. Generate accurate, varied questions. Return ONLY valid JSON.`,
   flashcards: `You are LearnFlow's flashcard generator. Create concise, atomic Q/A pairs. Return ONLY valid JSON.`,
   resources: `You are LearnFlow's resource curator. Suggest high-quality FREE resources. Return ONLY valid JSON.`,
+  chat: `You are LearnFlow's AI study assistant — a warm, sharp, encouraging coach who helps learners explain concepts, plan study time, review reflections, build quizzes/flashcards, and stay accountable. Use markdown freely: short paragraphs, **bold** key terms, lists, and \`\`\`code\`\`\` blocks where appropriate. Be concise but thorough. When given learner context (goals, streak, recent sessions), tailor advice to it. Never invent links or facts; if unsure, say so.`,
 };
 
 function buildPrompt(kind: string, payload: any): string {
@@ -150,6 +151,17 @@ Deno.serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
+    const isChat = kind === "chat";
+    const messages = isChat
+      ? [
+          { role: "system", content: SYSTEM_PROMPTS.chat + (payload?.context ? `\n\nLearner context:\n${payload.context}` : "") + (payload?.mode_hint ? `\n\nCurrent mode: ${payload.mode_hint}` : "") },
+          ...((payload?.messages || []) as Array<{ role: string; content: string }>),
+        ]
+      : [
+          { role: "system", content: SYSTEM_PROMPTS[kind] },
+          { role: "user", content: buildPrompt(kind, payload || {}) },
+        ];
+
     const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -158,11 +170,8 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         model: MODEL,
-        messages: [
-          { role: "system", content: SYSTEM_PROMPTS[kind] },
-          { role: "user", content: buildPrompt(kind, payload || {}) },
-        ],
-        temperature: kind === "explain" ? 0.5 : 0.4,
+        messages,
+        temperature: isChat ? 0.7 : kind === "explain" ? 0.5 : 0.4,
       }),
     });
 
@@ -178,7 +187,9 @@ Deno.serve(async (req) => {
     const content = aiData.choices?.[0]?.message?.content ?? "";
 
     let output: any;
-    if (kind === "explain") {
+    if (isChat) {
+      output = { message: content };
+    } else if (kind === "explain") {
       output = { markdown: content };
     } else {
       try { output = extractJson(content); }
