@@ -1,86 +1,78 @@
-## LearnFlow AI Workspace + Navigation Redesign
+## LearnFlow Refinement Plan
 
-A comprehensive transformation across 14 areas. Below is what I'll build, grouped by deliverable.
+A refinement pass — not a rewrite. Preserves existing branding (dark/purple, glassmorphism), data model, and feature set. Work is organized into 7 phases so we can ship and validate incrementally.
 
-### 1. Global AI Assistant (always-on)
+### Phase 1 — Information Architecture & Navigation
+- Collapse primary sidebar to 7 entries: **Dashboard, Study, Goals, Analysis, Community, AI Assistant, Profile**.
+- Move **Mentorship** under Profile (tab) and link from Community sidebar.
+- Move **Leaderboard, Achievements, Memory, Portfolio, Daily Report** into nested sections inside their parents (Analysis / Profile / Study).
+- Keep `SidebarContext` (already persists collapsed state in localStorage) and verify it never resets on route change.
+- Mobile: convert sidebar to Sheet/drawer with hamburger in `MobileTopBar`.
+- Active route highlighting and tooltips in collapsed mode (already partially in place — polish).
 
-- `src/contexts/AIAssistantContext.tsx` — global provider holding:
-  - chats array, active chat id, drawer open state, minimized state, selected mode
-  - persisted to `localStorage` so navigation never resets state
-  - `sendMessage`, `newChat`, `renameChat`, `deleteChat`, `pinChat`, `toggleFavorite`
-- `src/components/ai/FloatingAIButton.tsx` — fixed bottom-right, purple glow, pulse, glassmorphism. Hidden on `/ai` page. Sits above the notification inbox.
-- `src/components/ai/AIDrawer.tsx` — right-side Sheet (450–500px desktop / full-screen mobile), embeds the shared `<ChatWorkspace>` in compact mode. Minimize collapses to floating button without losing state.
-- Mounted once inside `Layout.tsx` so it persists across all authenticated routes.
+### Phase 2 — Dashboard refocus ("What should I do today?")
+Trim widgets to 6 sections in this order:
+1. Welcome header (name, streak, XP, level)
+2. Today's Goals (active goals + progress bars)
+3. Active Session card (Resume / Start)
+4. Progress Snapshot (focus hours, goals completed, recent activity)
+5. Community Highlights (trending posts, groups)
+6. Quick Actions (Start Session, Ask AI, Create Goal, View Analysis)
 
-### 2. Dedicated `/ai` Page
+Remove duplicated widgets, increase whitespace, single-column on mobile, 2-col tablet, 3-col desktop.
 
-- `src/pages/AIWorkspace.tsx` (route `/ai`) — full three-pane workspace:
-  - **Left rail**: New Chat, search, chat history grouped by Today / Yesterday / Previous 7 / Older, pin/favorite/rename/delete, plus secondary nav (Saved, Quizzes, Flashcards, Session Reviews) that map to existing assistant tabs.
-  - **Main**: `<ChatWorkspace>` (mode selector, quick action cards on empty, message list, composer).
-  - **Right panel** (desktop ≥xl only): user learning context — streak, XP, focus hours, active goals, recent sessions, quick actions. Sourced via new `useLearningContext` hook.
-- Old `/assistant` route redirects to `/ai`; existing tabbed tools (Reflection / Explain / Quiz / Flashcards / Resources / History) remain accessible via the left rail's "Tools" section.
+### Phase 3 — Study system & session persistence (critical)
+- Introduce `StudySessionContext` mounted in `Layout` that holds: `activeSessionId`, `startedAt`, `elapsedSeconds`, `topic`, `goalId`, `notes`, `interruptions`, `isPaused`.
+- Persist to `localStorage` key `learnflow:active-session` on every tick + write-through to `study_sessions` row in Supabase every 30s.
+- On mount: hydrate from localStorage → reconcile with Supabase open row (`ended_at IS NULL`).
+- Survives refresh, tab switch, navigation. Timer ticks via `requestAnimationFrame` driven from `startedAt + Date.now()` (not interval state) so backgrounded tabs stay accurate.
+- Reflections modal already exists — add explicit save confirmation and tag with goal_id.
+- **Learning Memory**: new search page under Study (`/study/memory`) with full-text search across `study_sessions.topic/notes`, `session_reflections.learned/challenged/revise`, `daily_reports`. Uses Supabase `ilike` with debounced query and grouped results.
 
-### 3. Modern Chat UI (`src/components/ai/ChatWorkspace.tsx` + subcomponents)
+### Phase 4 — AI Assistant trim & polish
+- Reduce modes from 8 → **3 (Explain, Quiz Generator, Session Review)**. Keep underlying edge function intact; just hide the others from `ai-modes.ts`.
+- Floating button + drawer already implemented — verify they persist on every authenticated route and don't reset on navigation.
+- `/ai` workspace: keep three-pane layout; ensure chat history (localStorage) survives reloads.
+- File upload "+" button: accept PDF/DOCX/TXT/MD/Images; for PDFs/DOCX use a lightweight client extractor (`pdfjs-dist` text, `mammoth` for docx) and send extracted text as context. Images sent as base64 (model supports vision). Action chips: Summarize / Explain / Generate Quiz / Extract Concepts.
 
-- `ModeSelector` — 8 modes (Explain, Quiz, Flashcards, Study Coach, Resource Finder, Session Review, Goal Planner, Roadmap) with icon + description, each mapped to a system prompt.
-- `QuickActionCards` — shown when chat is empty.
-- `EmptyState` — "Welcome back, {name}" + streak/XP/focus/goals progress + suggested actions.
-- `MessageList` — markdown rendering (`react-markdown` already installed), code blocks, timestamps, copy + regenerate buttons, typing indicator, skeletons.
-- `ChatComposer` — auto-growing textarea, multiline, "+" upload menu (PDF/DOCX/TXT/MD/images) with action chooser (Summarize / Explain / Quiz / Flashcards / Key Concepts / Study Plan), uploaded files render as chips above input.
-- Wires into existing `supabase/functions/ai-assistant/index.ts` (mode-aware). File contents are read client-side (text/markdown) or referenced by name for binary types (architecture-ready; actual binary parsing deferred).
+### Phase 5 — Community trim
+- Remove `Resources`, `Code Snippets`, `Achievement Posts` categories from filters / create-post dialog.
+- Keep: Questions, Study Logs, Projects, Study Groups.
+- Polish upvotes / helpful / solved / trending sidebar.
 
-### 4. Learning Context
+### Phase 6 — Analysis as Learning Intelligence Center
+Tabbed structure: **Overview · Trends · Focus · Goals · Roadmap · Insights**
+- Overview: focus hours, sessions, goals, streak, XP cards
+- Trends: weekly/monthly chart + GitHub-style consistency heatmap (already partly built — promote)
+- Focus: avg focus score, productive hours histogram, distraction trend
+- Goals: per-goal progress %, time spent, completion forecast
+- Roadmap: SkillTree component (existing) — keep as signature feature
+- Insights: AI-generated weekly summary + gap list (calls existing AI edge function)
 
-- `src/hooks/useLearningContext.ts` — aggregates goals, recent sessions, reflections, focus score, streak, XP, completed concepts, mentor feedback into a single object the AI mode prompts can consume. Used by right panel + injected as system context when chatting.
+### Phase 7 — Polish: Landing / Auth / SEO / Perf
+- Landing: tighten sections (Hero, Features, How It Works, Community, AI, Testimonials, Pricing, FAQ, CTA), wire buttons (Login → `/login`, Get Started → `/signup`).
+- Auth flow already correct (signup → verify-email → onboarding → dashboard) — audit `ProtectedRoute` gating and Resend wiring.
+- SEO: update `index.html` title `LearnFlow — Build Consistency. Master Skills.`, meta description, OG/Twitter tags, JSON-LD `SoftwareApplication`.
+- Perf: audit unnecessary re-renders (memoize heavy lists), prevent `AuthContext` reloads on tab focus (already fixed), confirm no SWR/polling thrash.
+- Accessibility sweep: aria-labels on icon-only buttons, `h-dvh` over `h-screen`, single `<main>`, tap targets ≥44px.
 
-### 5. Sidebar Redesign (collapse/expand)
+### Out of scope this pass
+- New database tables (everything fits existing schema).
+- Mentorship redesign beyond relocation.
+- Payment/Pricing implementation (Landing section is marketing only).
+- Advanced AI personalization (architecture prep only — context already piped via `useLearningContext`).
 
-- Refactor `src/components/AppSidebar.tsx`:
-  - Collapsed (72px) vs expanded (256px) with smooth width transition
-  - Header toggle button (PanelLeftClose/Open icon)
-  - Tooltips when collapsed
-  - Active route highlighting preserved
-- `src/contexts/SidebarContext.tsx` — `collapsed` state persisted in `localStorage` (`learnflow:sidebar:collapsed`)
-- `Layout.tsx` main margin shifts between `lg:ml-64` and `lg:ml-[72px]` reactively.
-- Mobile drawer (`MobileTopBar`) unchanged behavior; tablet uses overlay drawer pattern already in place.
+### Technical notes
+- All work in `src/` — no schema changes needed.
+- New files (~15): `StudySessionContext.tsx`, `LearningMemory.tsx` page, study/AI helper hooks, refined Analysis tab components, file-upload util.
+- Edited files (~25): `AppSidebar.tsx`, `Layout.tsx`, `App.tsx` routes, `Dashboard` (`Index.tsx`), `StudyTimer.tsx`, `Community.tsx`, `Analytics.tsx`, `Landing.tsx`, `index.html`, `ai-modes.ts`, etc.
+- No new dependencies for Phases 1–3, 5–7. Phase 4 adds `pdfjs-dist` + `mammoth` for client-side file extraction.
 
-### 6. Chat history storage
+### Suggested rollout order
+Phase 1 → 2 → 3 (highest user impact: nav + dashboard + no lost sessions) → 5 → 6 → 4 → 7.
 
-- `localStorage` key `learnflow:ai:chats` — array of `{ id, title, pinned, favorite, mode, messages, createdAt, updatedAt }`.
-- No DB migration needed for this pass (architecture-ready; can promote to Supabase later without UI changes).
-
-### 7. Performance / SPA
-
-- AI provider mounted once in `Layout` → drawer + state survive route changes.
-- Sidebar context above `Layout` so collapse persists across pages.
-- React Query already configured with `refetchOnWindowFocus: false`.
-
-### Files created
-- `src/contexts/AIAssistantContext.tsx`
-- `src/contexts/SidebarContext.tsx`
-- `src/hooks/useLearningContext.ts`
-- `src/components/ai/FloatingAIButton.tsx`
-- `src/components/ai/AIDrawer.tsx`
-- `src/components/ai/ChatWorkspace.tsx`
-- `src/components/ai/ChatComposer.tsx`
-- `src/components/ai/MessageList.tsx`
-- `src/components/ai/ModeSelector.tsx`
-- `src/components/ai/QuickActions.tsx`
-- `src/components/ai/EmptyState.tsx`
-- `src/components/ai/ChatHistorySidebar.tsx`
-- `src/components/ai/LearningContextPanel.tsx`
-- `src/pages/AIWorkspace.tsx`
-- `src/lib/ai-modes.ts`
-
-### Files edited
-- `src/App.tsx` — add `/ai` route, wrap with `SidebarProvider` + `AIAssistantProvider`, alias `/assistant` to `/ai`
-- `src/components/Layout.tsx` — mount `FloatingAIButton` + `AIDrawer`, react to sidebar collapse
-- `src/components/AppSidebar.tsx` — collapsible behavior, tooltips, persisted state, add `/ai` entry
-- `src/components/AppSidebar.tsx` navItems updated; existing `/assistant` link renamed to "AI Assistant" → `/ai`
-
-### Out of scope (explicit)
-- No new Supabase tables this pass — chats persist in `localStorage` so we don't block on schema design; the AI provider exposes the same surface so a DB swap later is mechanical.
-- Binary file parsing (PDF/DOCX) is wired in the UI (chips, upload menu, actions) but uses filename + size as context; OCR/extraction can be added later as an edge function.
-- Existing `/assistant` tabbed page kept and reachable from the left rail "Tools" group so no functionality is lost.
-
-Once approved I'll implement all of the above in one pass.
+### Questions before I start
+1. Confirm the 7-item nav list above (any item you want kept at top level that I moved to a nested section?).
+2. AI Assistant: OK to hide the 5 extra modes (Flashcards, Study Coach, Resource Finder, Goal Planner, Roadmap) without deleting them, so they can come back later?
+3. File upload extractors: OK to add `pdfjs-dist` + `mammoth` (~600KB combined gzipped, lazy-loaded only on `/ai`)?
+4. Should Phase 7 also include a real OG image (I can generate one), or keep current placeholder?

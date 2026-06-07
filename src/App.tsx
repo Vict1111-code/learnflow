@@ -21,6 +21,7 @@ import Leaderboard from "./pages/Leaderboard";
 import Profile from "./pages/Profile";
 import Onboarding from "./pages/Onboarding";
 import GoalDetail from "./pages/GoalDetail";
+import Goals from "./pages/Goals";
 import Analytics from "./pages/Analytics";
 import Portfolio from "./pages/Portfolio";
 import MentorDashboard from "./pages/MentorDashboard";
@@ -49,6 +50,7 @@ const protectedRoutes: Array<{ path: string; element: JSX.Element }> = [
   { path: "/community", element: <Community /> },
   { path: "/leaderboard", element: <Leaderboard /> },
   { path: "/profile", element: <Profile /> },
+  { path: "/goals", element: <Goals /> },
   { path: "/goal/:id", element: <GoalDetail /> },
   { path: "/analytics", element: <Analytics /> },
   { path: "/portfolio", element: <Portfolio /> },
