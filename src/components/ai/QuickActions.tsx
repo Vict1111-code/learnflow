@@ -1,22 +1,19 @@
-import { BookOpen, ListChecks, Layers, NotebookPen, Map, Link2, LucideIcon } from 'lucide-react';
+import { BookOpen, ListChecks, NotebookPen, LucideIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAIAssistant } from '@/contexts/AIAssistantContext';
 import { AIModeId } from '@/lib/ai-modes';
 
 interface Action { id: AIModeId; label: string; sample: string; icon: LucideIcon; }
 const ACTIONS: Action[] = [
-  { id: 'explain',    label: 'Explain a concept',  sample: 'Explain recursion at a beginner level with a simple example.',         icon: BookOpen },
-  { id: 'quiz',       label: 'Generate a quiz',    sample: 'Generate a 5-question quiz on JavaScript closures, medium difficulty.', icon: ListChecks },
-  { id: 'flashcards', label: 'Create flashcards',  sample: 'Create 10 flashcards covering core React hooks (useState, useEffect, useMemo, useCallback, useRef, useContext).', icon: Layers },
-  { id: 'review',     label: 'Analyze session',    sample: 'Review my latest study session: what should I revise and what should I tackle next?', icon: NotebookPen },
-  { id: 'roadmap',    label: 'Build a roadmap',    sample: 'Build a 6-week roadmap to become comfortable with backend engineering basics.', icon: Map },
-  { id: 'resources',  label: 'Find resources',     sample: 'Find free high-quality resources to learn TypeScript fundamentals.',  icon: Link2 },
+  { id: 'explain', label: 'Explain a concept', sample: 'Explain recursion at a beginner level with a simple example.',              icon: BookOpen },
+  { id: 'quiz',    label: 'Generate a quiz',   sample: 'Generate a 5-question quiz on JavaScript closures, medium difficulty.',    icon: ListChecks },
+  { id: 'review',  label: 'Analyze session',   sample: 'Review my latest study session: what should I revise and what should I tackle next?', icon: NotebookPen },
 ];
 
 export default function QuickActions() {
   const { setMode, sendMessage } = useAIAssistant();
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
       {ACTIONS.map((a, i) => {
         const Icon = a.icon;
         return (

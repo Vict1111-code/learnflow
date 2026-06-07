@@ -72,7 +72,11 @@ function loadChats(): AIChat[] {
 export function AIAssistantProvider({ children }: { children: ReactNode }) {
   const [chats, setChats] = useState<AIChat[]>(() => loadChats());
   const [activeChatId, setActiveChatId] = useState<string | null>(() => localStorage.getItem(ACTIVE_KEY));
-  const [mode, setModeState] = useState<AIModeId>(() => (localStorage.getItem(MODE_KEY) as AIModeId) || 'coach');
+  const [mode, setModeState] = useState<AIModeId>(() => {
+    const stored = localStorage.getItem(MODE_KEY) as AIModeId | null;
+    const valid: AIModeId[] = ['explain', 'quiz', 'review'];
+    return stored && valid.includes(stored) ? stored : 'explain';
+  });
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const ctxRef = useRef<LearningContext | undefined>(undefined);

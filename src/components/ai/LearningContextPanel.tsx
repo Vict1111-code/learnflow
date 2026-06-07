@@ -65,11 +65,10 @@ export default function LearningContextPanel() {
 
       <div className="rounded-2xl border border-border/60 bg-card/60 p-4 backdrop-blur-xl">
         <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Quick actions</div>
-        <div className="grid grid-cols-2 gap-1.5">
-          <button onClick={() => { setMode('coach'); newChat('coach'); }} className="rounded-lg border border-border/40 bg-background/40 px-2 py-1.5 text-xs hover:border-primary/40">Plan today</button>
-          <button onClick={() => { setMode('review'); newChat('review'); }} className="rounded-lg border border-border/40 bg-background/40 px-2 py-1.5 text-xs hover:border-primary/40">Review session</button>
+        <div className="grid grid-cols-1 gap-1.5">
+          <button onClick={() => { setMode('explain'); newChat('explain'); }} className="rounded-lg border border-border/40 bg-background/40 px-2 py-1.5 text-xs hover:border-primary/40">Explain a concept</button>
           <button onClick={() => { setMode('quiz'); newChat('quiz'); }} className="rounded-lg border border-border/40 bg-background/40 px-2 py-1.5 text-xs hover:border-primary/40">Quick quiz</button>
-          <button onClick={() => { setMode('flashcards'); newChat('flashcards'); }} className="rounded-lg border border-border/40 bg-background/40 px-2 py-1.5 text-xs hover:border-primary/40">Flashcards</button>
+          <button onClick={() => { setMode('review'); newChat('review'); }} className="rounded-lg border border-border/40 bg-background/40 px-2 py-1.5 text-xs hover:border-primary/40">Review session</button>
         </div>
       </div>
     </aside>
