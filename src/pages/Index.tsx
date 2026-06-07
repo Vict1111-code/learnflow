@@ -85,9 +85,9 @@ export default function Dashboard() {
 
   const quickActions = [
     { to: '/study', label: 'Start Session', icon: Timer, variant: 'primary' as const },
-    { to: '/report', label: 'Write Reflection', icon: PenLine, variant: 'ghost' as const },
-    { to: '/community', label: 'Join Study Group', icon: Users, variant: 'ghost' as const },
-    { to: '/onboarding', label: 'Create Goal', icon: Plus, variant: 'ghost' as const },
+    { to: '/ai', label: 'Ask AI', icon: Sparkles, variant: 'ghost' as const },
+    { to: '/goals', label: 'Create Goal', icon: Plus, variant: 'ghost' as const },
+    { to: '/analytics', label: 'View Analysis', icon: TrendingUp, variant: 'ghost' as const },
   ];
 
   return (
@@ -214,7 +214,7 @@ export default function Dashboard() {
                     ))}
                   </div>
                 ) : (
-                  <p className="py-4 text-sm text-muted-foreground">No active goals. <Link to="/onboarding" className="text-primary hover:underline">Create one →</Link></p>
+                  <p className="py-4 text-sm text-muted-foreground">No active goals. <Link to="/goals" className="text-primary hover:underline">Create one →</Link></p>
                 )}
               </motion.div>
 
