@@ -1,12 +1,15 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Timer, Users, User } from 'lucide-react';
+import { LayoutDashboard, Timer, Target, BarChart3, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+// Mobile bottom nav mirrors the primary sidebar order, minus AI (floating button)
+// and Profile (top-bar avatar / sheet menu) to keep the bar to 5 destinations.
 const tabs = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Home' },
-  { to: '/study', icon: Timer, label: 'Study' },
-  { to: '/community', icon: Users, label: 'Community' },
-  { to: '/profile', icon: User, label: 'Profile' },
+  { to: '/study',     icon: Timer,           label: 'Study' },
+  { to: '/goals',     icon: Target,          label: 'Goals' },
+  { to: '/analytics', icon: BarChart3,       label: 'Analysis' },
+  { to: '/community', icon: Users,           label: 'Community' },
 ];
 
 export default function MobileBottomNav() {
@@ -14,14 +17,16 @@ export default function MobileBottomNav() {
     <nav
       className="fixed inset-x-0 bottom-0 z-30 flex h-16 items-center justify-around border-t border-border/60 bg-background/90 backdrop-blur-xl lg:hidden"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      aria-label="Primary"
     >
       {tabs.map((tab) => (
         <NavLink
           key={tab.to}
           to={tab.to}
+          aria-label={tab.label}
           className={({ isActive }) =>
             cn(
-              'flex flex-1 flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors',
+              'flex min-h-11 flex-1 flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors',
               isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
             )
           }

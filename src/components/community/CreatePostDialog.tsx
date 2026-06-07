@@ -7,7 +7,8 @@ import { createPost } from '@/lib/database';
 import { toast } from 'sonner';
 import { POST_TYPE_META } from './PostCard';
 
-const TYPES = ['question', 'achievement', 'study_log', 'resource', 'project', 'code_snippet'] as const;
+// Trimmed to the four post types LearnFlow supports.
+const TYPES = ['question', 'study_log', 'project'] as const;
 
 export default function CreatePostDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
   const { user } = useAuth();
@@ -42,7 +43,7 @@ export default function CreatePostDialog({ open, onOpenChange }: { open: boolean
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Create Post</DialogTitle>
-          <DialogDescription>Share with the community — ask, teach, or celebrate progress.</DialogDescription>
+          <DialogDescription>Ask a question, share a study log, or showcase a project.</DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
           <div>
@@ -85,7 +86,6 @@ export default function CreatePostDialog({ open, onOpenChange }: { open: boolean
             <textarea
               value={content} onChange={(e) => setContent(e.target.value)} required rows={5} maxLength={5000}
               className="w-full rounded-lg border border-border bg-muted/50 px-4 py-3 text-sm focus:border-primary focus:outline-none"
-              placeholder={type === 'code_snippet' ? '```js\n// paste code here\n```' : ''}
             />
           </div>
           <div className="flex gap-3">

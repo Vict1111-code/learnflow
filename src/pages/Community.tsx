@@ -15,11 +15,8 @@ import StudyGroupsTab from '@/components/community/StudyGroupsTab';
 const FILTERS: Array<{ id: string; label: string }> = [
   { id: 'all', label: 'All' },
   { id: 'question', label: 'Questions' },
-  { id: 'achievement', label: 'Achievements' },
   { id: 'study_log', label: 'Study Logs' },
-  { id: 'resource', label: 'Resources' },
   { id: 'project', label: 'Projects' },
-  { id: 'code_snippet', label: 'Code' },
 ];
 
 export default function Community() {
