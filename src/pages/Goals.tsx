@@ -1,14 +1,12 @@
 import Layout from '@/components/Layout';
 import { motion } from 'framer-motion';
-import { Target, Plus } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Target } from 'lucide-react';
 import GoalsList from '@/components/GoalsList';
 import AddGoalDialog from '@/components/AddGoalDialog';
-import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 
 export default function Goals() {
-  const [addOpen, setAddOpen] = useState(false);
-
+  const qc = useQueryClient();
   return (
     <Layout>
       <div className="space-y-6">
@@ -25,14 +23,10 @@ export default function Goals() {
               Track milestones, deadlines, and progress for everything you're learning.
             </p>
           </div>
-          <Button onClick={() => setAddOpen(true)} className="bg-gradient-primary text-primary-foreground hover:opacity-90">
-            <Plus className="mr-2 h-4 w-4" /> New Goal
-          </Button>
+          <AddGoalDialog onGoalAdded={() => qc.invalidateQueries({ queryKey: ['learning-goals'] })} />
         </motion.div>
 
         <GoalsList />
-
-        <AddGoalDialog open={addOpen} onOpenChange={setAddOpen} />
       </div>
     </Layout>
   );
