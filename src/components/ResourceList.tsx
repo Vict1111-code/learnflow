@@ -1,13 +1,22 @@
 import { motion } from 'framer-motion';
-import { ExternalLink, BookOpen, Video, FileText, GraduationCap, Wrench, Book, ChevronDown, ChevronUp } from 'lucide-react';
+import {
+  ExternalLink, BookOpen, Video, FileText, GraduationCap, Wrench, Book,
+  ChevronDown, ChevronUp, Headphones, Rss, Users, Github,
+} from 'lucide-react';
 import { useState } from 'react';
+
+export type ResourceType =
+  | 'article' | 'video' | 'documentation' | 'book' | 'course' | 'tool'
+  | 'podcast' | 'blog' | 'community' | 'github';
 
 export interface Resource {
   title: string;
   url: string;
-  type: 'article' | 'video' | 'documentation' | 'book' | 'course' | 'tool';
+  type: ResourceType;
   conceptId?: string;
   description: string;
+  source?: string;
+  free?: boolean;
 }
 
 interface ResourceListProps {
@@ -22,6 +31,10 @@ const typeIcons: Record<string, React.ReactNode> = {
   book: <Book className="h-4 w-4" />,
   course: <GraduationCap className="h-4 w-4" />,
   tool: <Wrench className="h-4 w-4" />,
+  podcast: <Headphones className="h-4 w-4" />,
+  blog: <Rss className="h-4 w-4" />,
+  community: <Users className="h-4 w-4" />,
+  github: <Github className="h-4 w-4" />,
 };
 
 const typeColors: Record<string, string> = {
@@ -31,6 +44,10 @@ const typeColors: Record<string, string> = {
   book: 'bg-level/10 text-level border-level/20',
   course: 'bg-xp/10 text-xp border-xp/20',
   tool: 'bg-muted text-muted-foreground border-border',
+  podcast: 'bg-streak/10 text-streak border-streak/20',
+  blog: 'bg-primary/10 text-primary border-primary/20',
+  community: 'bg-level/10 text-level border-level/20',
+  github: 'bg-muted text-foreground border-border',
 };
 
 export default function ResourceList({ resources, conceptNames }: ResourceListProps) {
