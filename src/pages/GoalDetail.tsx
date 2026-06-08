@@ -363,6 +363,7 @@ export default function GoalDetail() {
 
         {/* AI Suggested Resources */}
         <AISuggestedResources
+          goalId={goal.id}
           goalDescription={goal.description}
           masteryLevel={goal.mastery_level}
           concepts={concepts.map(c => ({ id: c.id, name: c.name, status: c.status }))}
