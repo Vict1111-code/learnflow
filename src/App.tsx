@@ -54,6 +54,7 @@ const protectedRoutes: Array<{ path: string; element: JSX.Element }> = [
   { path: "/leaderboard", element: <Leaderboard /> },
   { path: "/profile", element: <Profile /> },
   { path: "/goals", element: <Goals /> },
+  { path: "/library", element: <Library /> },
   { path: "/goal/:id", element: <GoalDetail /> },
   { path: "/analytics", element: <Analytics /> },
   { path: "/portfolio", element: <Portfolio /> },
