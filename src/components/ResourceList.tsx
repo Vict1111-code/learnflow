@@ -94,11 +94,14 @@ export default function ResourceList({ resources, conceptNames }: ResourceListPr
                   {resource.title}
                 </p>
                 <p className="text-xs text-muted-foreground truncate">{resource.description}</p>
-                {resource.conceptId && conceptNames?.[resource.conceptId] && (
-                  <span className="text-[10px] text-muted-foreground">
-                    For: {conceptNames[resource.conceptId]}
-                  </span>
-                )}
+                <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
+                  <span className="capitalize rounded-full border border-border/60 px-1.5 py-0.5">{resource.type}</span>
+                  {resource.source && <span className="rounded-full bg-muted/40 px-1.5 py-0.5">{resource.source}</span>}
+                  {resource.free !== false && <span className="rounded-full bg-xp/15 px-1.5 py-0.5 text-xp">Free</span>}
+                  {resource.conceptId && conceptNames?.[resource.conceptId] && (
+                    <span>For: {conceptNames[resource.conceptId]}</span>
+                  )}
+                </div>
               </div>
               <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary transition-colors" />
             </motion.a>
