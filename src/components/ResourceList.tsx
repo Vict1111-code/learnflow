@@ -1,13 +1,22 @@
 import { motion } from 'framer-motion';
-import { ExternalLink, BookOpen, Video, FileText, GraduationCap, Wrench, Book, ChevronDown, ChevronUp } from 'lucide-react';
+import {
+  ExternalLink, BookOpen, Video, FileText, GraduationCap, Wrench, Book,
+  ChevronDown, ChevronUp, Headphones, Rss, Users, Github,
+} from 'lucide-react';
 import { useState } from 'react';
+
+export type ResourceType =
+  | 'article' | 'video' | 'documentation' | 'book' | 'course' | 'tool'
+  | 'podcast' | 'blog' | 'community' | 'github';
 
 export interface Resource {
   title: string;
   url: string;
-  type: 'article' | 'video' | 'documentation' | 'book' | 'course' | 'tool';
+  type: ResourceType;
   conceptId?: string;
   description: string;
+  source?: string;
+  free?: boolean;
 }
 
 interface ResourceListProps {
@@ -22,6 +31,10 @@ const typeIcons: Record<string, React.ReactNode> = {
   book: <Book className="h-4 w-4" />,
   course: <GraduationCap className="h-4 w-4" />,
   tool: <Wrench className="h-4 w-4" />,
+  podcast: <Headphones className="h-4 w-4" />,
+  blog: <Rss className="h-4 w-4" />,
+  community: <Users className="h-4 w-4" />,
+  github: <Github className="h-4 w-4" />,
 };
 
 const typeColors: Record<string, string> = {
@@ -31,6 +44,10 @@ const typeColors: Record<string, string> = {
   book: 'bg-level/10 text-level border-level/20',
   course: 'bg-xp/10 text-xp border-xp/20',
   tool: 'bg-muted text-muted-foreground border-border',
+  podcast: 'bg-streak/10 text-streak border-streak/20',
+  blog: 'bg-primary/10 text-primary border-primary/20',
+  community: 'bg-level/10 text-level border-level/20',
+  github: 'bg-muted text-foreground border-border',
 };
 
 export default function ResourceList({ resources, conceptNames }: ResourceListProps) {
@@ -77,11 +94,14 @@ export default function ResourceList({ resources, conceptNames }: ResourceListPr
                   {resource.title}
                 </p>
                 <p className="text-xs text-muted-foreground truncate">{resource.description}</p>
-                {resource.conceptId && conceptNames?.[resource.conceptId] && (
-                  <span className="text-[10px] text-muted-foreground">
-                    For: {conceptNames[resource.conceptId]}
-                  </span>
-                )}
+                <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
+                  <span className="capitalize rounded-full border border-border/60 px-1.5 py-0.5">{resource.type}</span>
+                  {resource.source && <span className="rounded-full bg-muted/40 px-1.5 py-0.5">{resource.source}</span>}
+                  {resource.free !== false && <span className="rounded-full bg-xp/15 px-1.5 py-0.5 text-xp">Free</span>}
+                  {resource.conceptId && conceptNames?.[resource.conceptId] && (
+                    <span>For: {conceptNames[resource.conceptId]}</span>
+                  )}
+                </div>
               </div>
               <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary transition-colors" />
             </motion.a>

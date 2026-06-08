@@ -45,6 +45,8 @@ export default function AISuggestedResources({
         url: r.url || '#',
         type: r.type || 'article',
         description: r.description || '',
+        source: r.source,
+        free: r.free !== false,
       }));
 
       setResources(suggested);
