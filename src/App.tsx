@@ -28,6 +28,7 @@ import MentorDashboard from "./pages/MentorDashboard";
 import Memory from "./pages/Memory";
 import AIAssistant from "./pages/AIAssistant";
 import AIWorkspace from "./pages/AIWorkspace";
+import Library from "./pages/Library";
 import NotFound from "./pages/NotFound";
 import { SidebarProvider } from "./contexts/SidebarContext";
 import { AIAssistantProvider } from "./contexts/AIAssistantContext";
