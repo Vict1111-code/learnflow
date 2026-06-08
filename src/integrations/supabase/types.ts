@@ -774,6 +774,71 @@ export type Database = {
         }
         Relationships: []
       }
+      saved_resources: {
+        Row: {
+          concept_ids: string[]
+          concept_names: string[]
+          created_at: string
+          description: string | null
+          goal_id: string | null
+          id: string
+          is_free: boolean
+          notes: string | null
+          rationale: string | null
+          source: string | null
+          tags: string[]
+          title: string
+          type: string
+          updated_at: string
+          url: string
+          user_id: string
+        }
+        Insert: {
+          concept_ids?: string[]
+          concept_names?: string[]
+          created_at?: string
+          description?: string | null
+          goal_id?: string | null
+          id?: string
+          is_free?: boolean
+          notes?: string | null
+          rationale?: string | null
+          source?: string | null
+          tags?: string[]
+          title: string
+          type?: string
+          updated_at?: string
+          url: string
+          user_id: string
+        }
+        Update: {
+          concept_ids?: string[]
+          concept_names?: string[]
+          created_at?: string
+          description?: string | null
+          goal_id?: string | null
+          id?: string
+          is_free?: boolean
+          notes?: string | null
+          rationale?: string | null
+          source?: string | null
+          tags?: string[]
+          title?: string
+          type?: string
+          updated_at?: string
+          url?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_resources_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "learning_goals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       session_reflections: {
         Row: {
           challenged: string | null

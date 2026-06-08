@@ -1,9 +1,11 @@
 import Layout from '@/components/Layout';
 import { motion } from 'framer-motion';
-import { Target } from 'lucide-react';
+import { Target, Bookmark } from 'lucide-react';
 import GoalsList from '@/components/GoalsList';
 import AddGoalDialog from '@/components/AddGoalDialog';
 import { useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
 
 export default function Goals() {
   const qc = useQueryClient();
@@ -23,7 +25,12 @@ export default function Goals() {
               Track milestones, deadlines, and progress for everything you're learning.
             </p>
           </div>
-          <AddGoalDialog onGoalAdded={() => qc.invalidateQueries({ queryKey: ['learning-goals'] })} />
+          <div className="flex items-center gap-2">
+            <Button asChild variant="outline" size="sm" className="gap-2">
+              <Link to="/library"><Bookmark className="h-4 w-4" /> Library</Link>
+            </Button>
+            <AddGoalDialog onGoalAdded={() => qc.invalidateQueries({ queryKey: ['learning-goals'] })} />
+          </div>
         </motion.div>
 
         <GoalsList />
