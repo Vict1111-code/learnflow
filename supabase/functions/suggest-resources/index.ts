@@ -47,43 +47,70 @@ Deno.serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const conceptList = Array.isArray(concepts)
-      ? concepts.map((c: any) => `- ${c.name} (${c.status})`).join("\n")
-      : "None provided";
+    // Bucket concepts by status to anchor the AI on the learner's CURRENT level
+    const completed: string[] = [];
+    const available: string[] = [];
+    const locked: string[] = [];
+    if (Array.isArray(concepts)) {
+      for (const c of concepts) {
+        const name = (c as any).name;
+        const status = (c as any).status;
+        if (!name) continue;
+        if (status === "completed") completed.push(name);
+        else if (status === "available" || status === "in_progress") available.push(name);
+        else locked.push(name);
+      }
+    }
 
+    const total = completed.length + available.length + locked.length;
+    const progressPct = total > 0 ? Math.round((completed.length / total) * 100) : 0;
+    // Effective level: lean one step up if the learner is well past the halfway mark
+    const levelOrder = ["beginner", "intermediate", "advanced"];
+    const baseIdx = Math.max(0, levelOrder.indexOf((masteryLevel || "beginner").toLowerCase()));
+    const effectiveIdx = progressPct >= 60 ? Math.min(2, baseIdx + 1) : baseIdx;
+    const effectiveLevel = levelOrder[effectiveIdx];
+
+    const focusList = available.length > 0 ? available : (locked.slice(0, 3));
     const confusionList = Array.isArray(confusionPatterns) && confusionPatterns.length > 0
       ? confusionPatterns.join(", ")
       : "None reported";
 
-    const systemPrompt = `You are a learning resource curator. You suggest high-quality, FREE learning resources matched to a learner's specific needs. You MUST respond with ONLY a valid JSON object.`;
+    const systemPrompt = `You are an expert learning resource curator. You ONLY recommend FREE, currently-online, high-quality resources from well-known reputable sources. You MUST respond with ONLY a valid JSON object — no markdown, no commentary.`;
 
-    const userPrompt = `Suggest 6-10 free learning resources for a learner studying: "${goalDescription}"
+    const userPrompt = `Curate 10-14 FREE learning resources for a learner whose goal is: "${goalDescription}".
 
-Current mastery level: ${masteryLevel || "beginner"}
-Concepts in their learning tree:
-${conceptList}
+Learner state:
+- Stated mastery level: ${masteryLevel || "beginner"}
+- Skill-tree progress: ${completed.length}/${total} concepts completed (${progressPct}%)
+- Effective level to target: ${effectiveLevel}
+- Already mastered: ${completed.join(", ") || "(none yet)"}
+- Currently working on / next up: ${focusList.join(", ") || "(foundations of the topic)"}
+- Locked / future concepts: ${locked.slice(0, 8).join(", ") || "(none listed)"}
+- Areas of confusion: ${confusionList}
 
-Areas of confusion: ${confusionList}
-
-Return ONLY this JSON (no markdown, no fences):
+Return ONLY this JSON shape:
 {
   "resources": [
     {
-      "title": "Resource Title",
-      "url": "https://real-url.com",
-      "type": "article",
-      "description": "One-line description of why this helps",
-      "relevance": "confusion" | "foundation" | "advancement" | "practice"
+      "title": "Exact resource title",
+      "url": "https://real-and-currently-working-url",
+      "type": "article" | "video" | "documentation" | "book" | "course" | "tool" | "podcast" | "blog" | "community" | "github",
+      "source": "Publisher / channel / org name (e.g. MDN, freeCodeCamp, Coursera, Real Python, 3Blue1Brown, The Changelog, r/learnprogramming, Project Gutenberg)",
+      "free": true,
+      "description": "One short sentence on why this helps THIS learner right now",
+      "relevance": "confusion" | "foundation" | "current" | "advancement" | "practice" | "community"
     }
   ]
 }
 
-Requirements:
-- type must be one of: article, video, documentation, book, course, tool
-- Use REAL URLs to free resources (MDN, freeCodeCamp, YouTube channels, official docs, Khan Academy, Coursera free courses, etc.)
-- Prioritize resources that address the learner's confusion patterns
-- Include a mix of types (articles, videos, docs, courses)
-- Sort by relevance: confusion-targeted first, then foundational, then advancement`;
+Strict requirements:
+1. EVERY resource MUST be free to access without a paywall (free MOOCs, official docs, YouTube, freeCodeCamp, MDN, Khan Academy, Coursera audit, edX audit, MIT OCW, Harvard CS50, Stanford Online, Project Gutenberg, LibriVox, arXiv, GitHub, official blogs, Substack free tier, podcasts on public feeds, Discord/Reddit/Stack Exchange communities, etc.). Mark "free": true. NEVER include paid books or paid courses.
+2. URLs MUST be REAL and to canonical, long-lived pages (publisher homepage, official docs, channel page, repo). NEVER invent URLs. NEVER use random blog spam.
+3. Match the EFFECTIVE level (${effectiveLevel}). Do NOT recommend beginner intros if the learner is already past foundations; do NOT recommend advanced material if foundations aren't done.
+4. Cover a DIVERSE mix of formats. Aim for at least one of EACH where it makes sense: documentation, video, article/blog, book (free/open), course (free), podcast or audio, community (Discord/Reddit/Slack/forum), tool, github repo.
+5. Prioritise resources that directly address the "Currently working on" concepts and any confusion areas; then add foundation reinforcement, then 1-2 advancement resources to pull the learner forward.
+6. Prefer well-known, maintained sources. Avoid dead links, course-mill sites, and content farms.
+7. Sort by relevance: confusion > current > foundation > practice > advancement > community.`;
 
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -92,12 +119,12 @@ Requirements:
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-pro",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        temperature: 0.3,
+        temperature: 0.2,
       }),
     });
 
@@ -123,7 +150,6 @@ Requirements:
     const content = aiData.choices?.[0]?.message?.content;
     if (!content) throw new Error("No content in AI response");
 
-    // Parse JSON from response
     let cleaned = content.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
     const start = cleaned.indexOf("{");
     const end = cleaned.lastIndexOf("}");
@@ -139,9 +165,24 @@ Requirements:
       parsed = JSON.parse(fixed);
     }
 
-    const resources = Array.isArray(parsed.resources) ? parsed.resources : [];
+    const allowedTypes = new Set([
+      "article", "video", "documentation", "book", "course", "tool",
+      "podcast", "blog", "community", "github",
+    ]);
 
-    return new Response(JSON.stringify({ resources }), {
+    const resources = (Array.isArray(parsed.resources) ? parsed.resources : [])
+      .filter((r: any) => r && typeof r.url === "string" && /^https?:\/\//i.test(r.url))
+      .map((r: any) => ({
+        title: String(r.title || "Resource"),
+        url: r.url,
+        type: allowedTypes.has(r.type) ? r.type : "article",
+        source: r.source ? String(r.source) : undefined,
+        free: r.free !== false,
+        description: String(r.description || ""),
+        relevance: r.relevance,
+      }));
+
+    return new Response(JSON.stringify({ resources, effectiveLevel, progressPct }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
